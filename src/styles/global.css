@@ -498,6 +498,44 @@ html.theme-switching *::after {
 }
 
 /* ==========================================================
+   文章编辑入口（「＋ 写新文章」）
+   只有本机存着 GitHub 令牌时，脚本才会把 hidden 去掉；
+   访客看到的是普通页面，连按钮都没有。
+   ========================================================== */
+.aedit-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  border: 1px dashed var(--accent-border);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+/* inline-flex 会盖掉 [hidden] 的 display:none，这里补回来 */
+.aedit-open[hidden] {
+  display: none;
+}
+
+.aedit-open:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-style: solid;
+}
+
+.aedit-open__hint {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* ==========================================================
    手机端底部标签栏
    --tabbar-h 是「要给它让出的高度」，桌面端为 0。
    右下角齿轮、正文底部留白都靠它定位，改一处就够了。

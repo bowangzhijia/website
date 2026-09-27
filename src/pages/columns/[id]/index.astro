@@ -33,7 +33,7 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
 <BaseLayout title={column.name} description={column.desc}>
   {
     isFeed ? (
-      <section class="feedpage">
+      <section class="feedpage" data-view>
         <div class="wrap">
           <header class="feedpage__head">
             <h1 class="feedpage__title">{column.name}</h1>
@@ -41,8 +41,10 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
             <p class="feedpage__intro">{intro.body}</p>
           </header>
 
-          {/* 只有本机有令牌才显示，访客看不到 */}
-          <ArticleEditor mode="new" column={column.id} columnName={column.name} />
+          {/* 只有本机有令牌才显示，访客连按钮都看不到 */}
+          <button class="aedit-open" type="button" data-new-open hidden>
+            ＋ 写新文章<span class="aedit-open__hint">{column.name}</span>
+          </button>
 
           <ColumnFeed posts={posts} columnId={column.id} />
 
@@ -54,7 +56,7 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
         </div>
       </section>
     ) : (
-  <section class="screen">
+  <section class="screen" data-view>
     <div class="wrap screen__inner">
       <div class={`landing${isMessage ? ' landing--single' : ''}`}>
         <div class="left">
@@ -67,7 +69,13 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
             <p class="welcome__body">{intro.body}</p>
           </div>
 
-          {canPost && <ArticleEditor mode="new" column={column.id} columnName={column.name} />}
+          {
+            canPost && (
+              <button class="aedit-open" type="button" data-new-open hidden>
+                ＋ 写新文章<span class="aedit-open__hint">{column.name}</span>
+              </button>
+            )
+          }
 
           <div id="subscribe">
             {isMessage ? <MessageForm /> : <SubscribeForm />}
@@ -100,6 +108,9 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
   </section>
     )
   }
+
+  {/* 编辑区：普通的页面内容，点入口时把上面那块（data-view）换下去 */}
+  {canPost && <ArticleEditor mode="new" column={column.id} columnName={column.name} />}
 </BaseLayout>
 
 <style>

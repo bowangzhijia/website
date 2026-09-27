@@ -1,11 +1,15 @@
 ---
 /**
- * 文章编辑面板，两种用法：
+ * 文章编辑区，两种用法：
  *   mode="edit"（默认）—— 文章页上改这一篇
- *   mode="new"        —— 栏目页上写一篇新的，栏目已经定好，不用选
+ *   mode="new"        —— 栏目页上写一篇新的，栏目已经定好
  *
- * 平时是隐藏的，本机存着 GitHub 令牌时脚本才会把入口亮出来。
- * 访客拿到的页面里这块是 hidden 的，而且就算手动打开也提交不了——
+ * 关键：它**不是浮层**，而是一段普通的页面内容。
+ * 打开时把页面原本的内容（标了 data-view 的那块）藏起来，
+ * 网站顶栏、底部标签栏都还在——跟文章页长得一样。
+ *
+ * 平时整段是 hidden 的，只有本机存着 GitHub 令牌时脚本才会把入口亮出来。
+ * 访客拿到的页面里这块是隐藏的，而且就算手动打开也提交不了——
  * 发布需要令牌，令牌只在你自己的浏览器里。
  */
 import { SECTORS } from '../site.config';
@@ -15,13 +19,13 @@ interface Props {
   mode?: 'edit' | 'new';
   /** 栏目 id */
   column: string;
-  /** 栏目显示名，按钮上给个提示 */
+  /** 栏目显示名 */
   columnName?: string;
   /** 文件名（不含 .md），就是日期。mode="new" 时不用传 */
   file?: string;
   title?: string;
   summary?: string;
-  /** ISO 日期，例如 2026-09-27。mode="new" 时留空，由脚本填「今天」 */
+  /** ISO 日期。mode="new" 时留空，由脚本填「今天」 */
   date?: string;
   sectors?: string[];
   /** Markdown 正文原文 */
@@ -58,18 +62,10 @@ const payload = {
 const json = JSON.stringify(payload).replace(/</g, '\\u003c');
 ---
 
-{
-  isNew && (
-    <button class="aedit__open" type="button" data-new-open hidden>
-      ＋ 写新文章<span class="aedit__open-hint">{columnName}</span>
-    </button>
-  )
-}
-
-<dialog class="aedit" data-edit-panel>
-  <div class="aedit__bar">
-    <div class="aedit__bar-inner">
-      <button class="aedit__cancel" type="button" data-edit-cancel>
+<section class="aedit" data-edit-panel hidden>
+  <div class="aedit__inner">
+    <div class="aedit__top">
+      <button class="aedit__back" type="button" data-edit-cancel>
         <svg
           viewBox="0 0 24 24"
           width="18"
@@ -85,19 +81,18 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
         </svg>
         {columnName || '返回'}
       </button>
-      <span class="aedit__label">{isNew ? '写新文章' : '编辑这篇文章'}</span>
-    </div>
-  </div>
 
-  <div class="aedit__scroll">
-    {
-      isNew && (
-        <div class="afield">
-          <span class="afield__name">栏目</span>
-          <p class="aedit__fixed">{columnName}</p>
-        </div>
-      )
-    }
+      <button class="aedit__submit" type="button" data-edit-save>
+        {isNew ? '发布' : '保存'}
+      </button>
+    </div>
+
+    <h1 class="aedit__title">{isNew ? '写新文章' : '编辑这篇文章'}</h1>
+
+    <div class="afield">
+      <span class="afield__name">栏目</span>
+      <p class="aedit__fixed">{columnName}</p>
+    </div>
 
     <label class="afield">
       <span class="afield__name">标题</span>
@@ -132,132 +127,57 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
       <span class="afield__name">正文<span class="afield__opt">Markdown</span></span>
       <textarea data-edit-body rows="18" spellcheck="false"></textarea>
     </label>
-  </div>
 
-  <div class="aedit__foot">
     <p class="aedit__msg" data-edit-msg role="status" aria-live="polite"></p>
-    <div class="aedit__acts">
-      <button class="abtn abtn--primary" type="button" data-edit-save>
-        {isNew ? '发布' : '保存并发布'}
-      </button>
-      <button class="abtn abtn--danger" type="button" data-edit-delete hidden={isNew}>
-        删除
-      </button>
+
+    <div class="aedit__foot">
+      <button class="aedit__danger" type="button" data-edit-delete hidden={isNew}>删除这篇文章</button>
     </div>
   </div>
-</dialog>
+</section>
 
 <script type="application/json" id="article-data" set:html={json}></script>
 <script is:inline set:html={editScript}></script>
 
 <style>
-  /* ---------- 栏目页上的「写新文章」入口 ---------- */
-  .aedit__open {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 9px 16px;
-    /* 隐藏时 display:none，外边距不占位，访客看不到任何空隙 */
-    margin-bottom: 18px;
-    border-radius: 999px;
-    border: 1px dashed var(--accent-border);
-    background: var(--accent-tint);
-    color: var(--accent);
-    font-family: inherit;
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.16s ease, color 0.16s ease;
-  }
-
-  /* inline-flex 会盖掉 [hidden] 的 display:none，这里补回来 */
-  .aedit__open[hidden] {
-    display: none;
-  }
-
-  .aedit__open:hover {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-style: solid;
-  }
-
-  .aedit__open-hint {
-    font-weight: 400;
-    opacity: 0.75;
-  }
-
-  /* ---------- 全屏编辑面板 ---------- */
   /*
-   * 用原生 <dialog> + showModal()：浏览器会把它放进「顶层」（top layer），
-   * 永远盖在所有内容之上，不受任何祖先的 transform / 层叠上下文影响。
-   *
-   * 之前用普通 div + position:fixed 出过问题：只要某个祖先产生了层叠上下文
-   * （比如给 main 加一个淡入动画），面板的 z-index 就被关在那个上下文里，
-   * 反而被粘性顶栏压住——看起来就是「不是一个完整图层」。
+   * 整块是普通页面内容，不是浮层：
+   * 网站顶栏、底部标签栏都在，跟文章页同一个版心（720px）。
    */
   .aedit {
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: var(--bg);
-    color: var(--text);
-    overflow: hidden;
+    flex: 1;
+    padding: 34px 0 60px;
   }
 
-  /* 没打开时（没有 open 属性）什么都不显示 */
-  .aedit:not([open]) {
+  .aedit[hidden] {
     display: none;
   }
 
-  .aedit[open] {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /*
-   * 顶栏本身铺满整宽（边框和毛玻璃要通栏），
-   * 但里面的内容收在跟输入框同一列（max-width: 680px）里，
-   * 这样返回按钮和下面的「栏目 / 标题 …」左边缘是齐的，
-   * 而不是贴到屏幕最左边。
-   */
-  .aedit__bar {
-    flex: none;
-    padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
-    border-bottom: 1px solid var(--border);
-    background: var(--header-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-
-  /*
-   * 用 grid 而不是 flex：左右两栏等宽，
-   * 中间的标题才能真正居中，不会因为返回按钮文字长短而左右晃。
-   */
-  .aedit__bar-inner {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 10px;
-    max-width: 680px;
+  /* 和文章页 .wrap.art__inner 同样的版心宽度，切换时内容不会跳位 */
+  .aedit__inner {
+    width: 100%;
+    max-width: 720px;
     margin-inline: auto;
+    padding-inline: 22px;
   }
 
-  /*
-   * 返回：和文章页、写作台完全同一种样式——纯文字 + 箭头，
-   * 不描边、不填底色。留 40px 高只为触摸手感，不画出来。
-   */
-  .aedit__cancel {
-    justify-self: start;
+  /* ---------- 顶部一行：返回在左、主操作在右，和文章页一致 ---------- */
+  .aedit__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  /* 纯文字 + 箭头，和文章页/写作台的返回同一种样式 */
+  .aedit__back {
     display: inline-flex;
     align-items: center;
     gap: 2px;
     height: 40px;
     margin-left: -6px;
-    padding-right: 8px;
+    padding: 0;
     border: 0;
     background: none;
     color: var(--text-dim);
@@ -267,33 +187,41 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     cursor: pointer;
   }
 
-  .aedit__cancel:hover {
+  .aedit__back:hover {
     color: var(--accent);
   }
 
-  .aedit__label {
-    text-align: center;
+  /* 主操作做成圆角胶囊，对应文章页右上角的「编辑这篇」 */
+  .aedit__submit {
+    flex: none;
+    min-height: 40px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+    font-family: inherit;
     font-size: 14px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    cursor: pointer;
+    box-shadow: 0 6px 18px var(--accent-glow);
   }
 
-  .aedit__scroll {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 18px 16px 24px;
+  .aedit__submit:disabled {
+    opacity: 0.55;
+    cursor: default;
   }
 
-  .aedit__scroll > * {
-    max-width: 680px;
-    margin-inline: auto;
-    display: block;
+  .aedit__title {
+    font-size: clamp(22px, 3vw, 28px);
+    letter-spacing: -0.03em;
+    margin: 0 0 22px;
   }
 
   /* ---------- 表单 ---------- */
   .afield {
-    margin-bottom: 16px;
+    display: block;
+    margin-bottom: 17px;
   }
 
   .afield__name {
@@ -314,6 +242,16 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     color: var(--faint);
   }
 
+  /* 栏目只作告知，不能改 */
+  .aedit__fixed {
+    margin: 0;
+    padding: 11px 14px;
+    border-radius: 11px;
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
   .aedit input[type='text'],
   .aedit input[type='date'],
   .aedit textarea {
@@ -328,6 +266,7 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     font-size: 16px;
     line-height: 1.65;
     outline: none;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
   }
 
   .aedit textarea {
@@ -341,16 +280,6 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   .aedit textarea:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-glow);
-  }
-
-  /* 新建模式下的固定栏目，只是告知，不可改 */
-  .aedit__fixed {
-    margin: 0;
-    padding: 11px 14px;
-    border-radius: 11px;
-    background: var(--chip-fill);
-    color: var(--text-dim);
-    font-size: 15px;
   }
 
   /* ---------- 行业 ---------- */
@@ -390,23 +319,13 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     font-weight: 700;
   }
 
-  /* ---------- 底部操作条 ---------- */
-  .aedit__foot {
-    flex: none;
-    padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--border);
-    background: var(--header-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-
+  /* ---------- 状态与删除 ---------- */
   .aedit__msg {
-    min-height: 18px;
-    margin: 0 0 8px;
-    font-size: 12.5px;
-    line-height: 1.55;
+    min-height: 20px;
+    margin: 14px 0 0;
+    font-size: 13px;
+    line-height: 1.6;
     color: var(--muted);
-    text-align: center;
   }
 
   .aedit__msg[data-state='ok'] {
@@ -417,44 +336,36 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     color: var(--up);
   }
 
-  .aedit__acts {
-    display: flex;
-    gap: 9px;
-    max-width: 680px;
-    margin-inline: auto;
+  .aedit__foot {
+    margin-top: 10px;
   }
 
-  .abtn {
-    flex: 1;
-    min-height: 46px;
-    border-radius: 12px;
-    border: 1px solid transparent;
-    font-family: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: opacity 0.16s ease;
-  }
-
-  .abtn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .abtn--primary {
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-fg);
-  }
-
-  .abtn--danger {
-    flex: 0 0 88px;
-    border-color: color-mix(in srgb, var(--up) 40%, transparent);
+  .aedit__danger {
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--up) 40%, transparent);
     background: transparent;
     color: var(--up);
+    font-family: inherit;
+    font-size: 13.5px;
     font-weight: 600;
+    cursor: pointer;
   }
 
-  .abtn--danger:hover {
+  .aedit__danger:hover {
     background: color-mix(in srgb, var(--up) 10%, transparent);
+  }
+
+  .aedit__danger[hidden] {
+    display: none;
+  }
+
+  @media (max-width: 640px) {
+    .aedit {
+      padding: 20px 0 48px;
+    }
+    .aedit__top {
+      margin-bottom: 16px;
+    }
   }
 </style>

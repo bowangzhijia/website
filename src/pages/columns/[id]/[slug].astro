@@ -42,7 +42,8 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
   type="article"
   publishedTime={post.data.date.toISOString()}
 >
-  <article class="art">
+  {/* data-view：编辑时把这块换下去，编辑区顶上来 */}
+  <article class="art" data-view>
     <div class="wrap art__inner">
       <div class="art__top">
         <a class="art__back" href={`/columns/${post.data.column}/`}>

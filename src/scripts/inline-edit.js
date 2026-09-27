@@ -209,31 +209,29 @@
     post.title = d.title;
   }
 
-  /** 面板是否开着（读 dialog 的 open 属性） */
+  /** 编辑区是否开着 */
   function isOpen() {
-    return panel.hasAttribute('open');
+    return !panel.hidden;
+  }
+
+  /** 页面原本的内容，编辑时先藏起来，编辑完再放出来 */
+  function pageView() {
+    return document.querySelector('[data-view]');
   }
 
   function showPanel() {
-    // showModal() 会把面板放进浏览器「顶层」，盖住顶栏在内的一切内容
-    try {
-      if (typeof panel.showModal === 'function') panel.showModal();
-      else panel.setAttribute('open', '');
-    } catch (e) {
-      panel.setAttribute('open', '');
-    }
-    document.body.style.overflow = 'hidden';
+    // 编辑区是普通页面内容，不做浮层：只把原内容换下去，
+    // 网站顶栏和底部标签栏都保持原样
+    var view = pageView();
+    if (view) view.hidden = true;
+    panel.hidden = false;
     window.scrollTo({ top: 0 });
   }
 
   function hidePanel() {
-    try {
-      if (typeof panel.close === 'function' && panel.hasAttribute('open')) panel.close();
-      else panel.removeAttribute('open');
-    } catch (e) {
-      panel.removeAttribute('open');
-    }
-    document.body.style.overflow = '';
+    panel.hidden = true;
+    var view = pageView();
+    if (view) view.hidden = false;
     say('');
   }
 
@@ -272,11 +270,7 @@
     }
   });
 
-  // Esc：挡掉浏览器默认的关闭，走自己的 close，才能同步历史记录
-  panel.addEventListener('cancel', function (e) {
-    e.preventDefault();
-    close();
-  });
+
 
   function collect() {
     return {
