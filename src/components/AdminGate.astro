@@ -1,0 +1,218 @@
+---
+/**
+ * 右下角的设置入口。
+ * 访客看到的只是一个齿轮图标，点开要求填生日，填对了才进写作台。
+ */
+---
+
+<div class="gate">
+  <button class="gate__btn" type="button" data-gate-open aria-label="设置" title="设置">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+</div>
+
+<div class="gmodal" data-gate-modal hidden>
+  <div class="gmodal__mask" data-gate-close></div>
+  <div class="gmodal__box" role="dialog" aria-modal="true" aria-label="请输入生日">
+    <p class="gmodal__title">请填写生日</p>
+    <input class="gmodal__input" type="date" data-gate-input />
+    <p class="gmodal__msg" data-gate-msg></p>
+    <div class="gmodal__actions">
+      <button class="gbtn" type="button" data-gate-close>取消</button>
+      <button class="gbtn gbtn--primary" type="button" data-gate-submit>确定</button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    var modal = document.querySelector('[data-gate-modal]');
+    if (!modal) return;
+
+    var input = modal.querySelector('[data-gate-input]');
+    var msg = modal.querySelector('[data-gate-msg]');
+    var openBtn = document.querySelector('[data-gate-open]');
+    var submitBtn = modal.querySelector('[data-gate-submit]');
+
+    function open() {
+      modal.hidden = false;
+      msg.textContent = '';
+      msg.dataset.state = '';
+      input.value = '';
+      setTimeout(function () {
+        input.focus();
+      }, 60);
+    }
+
+    function close() {
+      modal.hidden = true;
+    }
+
+    function submit() {
+      if (!window.BowangAuth) {
+        msg.textContent = '加载失败，请刷新页面重试';
+        msg.dataset.state = 'error';
+        return;
+      }
+      submitBtn.disabled = true;
+      msg.textContent = '验证中…';
+      msg.dataset.state = '';
+
+      window.BowangAuth.check(input.value).then(function (ok) {
+        submitBtn.disabled = false;
+        if (ok) {
+          window.BowangAuth.mark();
+          location.href = '/write/';
+        } else {
+          msg.textContent = '日期不对';
+          msg.dataset.state = 'error';
+          input.select();
+        }
+      });
+    }
+
+    openBtn.addEventListener('click', open);
+    submitBtn.addEventListener('click', submit);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submit();
+    });
+    modal.querySelectorAll('[data-gate-close]').forEach(function (el) {
+      el.addEventListener('click', close);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) close();
+    });
+  })();
+</script>
+
+<style>
+  .gate {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 40;
+  }
+
+  .gate__btn {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--header-bg);
+    backdrop-filter: blur(8px);
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .gate__btn:hover {
+    opacity: 1;
+    color: var(--accent);
+    border-color: var(--accent-border);
+    transform: rotate(35deg);
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .gmodal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+  }
+
+  /* display:grid 会盖掉浏览器默认的 [hidden]，这里显式补回来 */
+  .gmodal[hidden] {
+    display: none;
+  }
+
+  .gmodal__mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.42);
+  }
+
+  .gmodal__box {
+    position: relative;
+    width: min(330px, 100%);
+    padding: 22px 20px 18px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  .gmodal__title {
+    margin: 0 0 16px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .gmodal__input {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    outline: none;
+  }
+
+  .gmodal__input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .gmodal__msg {
+    min-height: 20px;
+    margin: 9px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .gmodal__msg[data-state='error'] {
+    color: var(--up);
+  }
+
+  .gmodal__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .gbtn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .gbtn--primary {
+    border-color: transparent;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+  }
+
+  .gbtn:disabled {
+    opacity: 0.55;
+  }
+</style>

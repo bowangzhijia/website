@@ -58,11 +58,7 @@ const pageTitle = SITE.tagline;
         }
       </nav>
 
-      <p class="home__risk">
-        {RISK_NOTE}
-        <span class="home__sep" aria-hidden="true">·</span>
-        <a class="home__write" href="/write/">写作台</a>
-      </p>
+      <p class="home__risk">{RISK_NOTE}</p>
     </div>
   </section>
 </BaseLayout>
@@ -229,21 +225,7 @@ const pageTitle = SITE.tagline;
     color: var(--muted);
   }
 
-  /* 站主自用的入口，做得低调一些，访客基本不会注意 */
-  .home__sep {
-    margin: 0 6px;
-    color: var(--faint);
-  }
 
-  .home__write {
-    color: var(--muted);
-    border-bottom: 1px dashed var(--border-strong);
-  }
-
-  .home__write:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
 
   @media (max-width: 640px) {
     .home {

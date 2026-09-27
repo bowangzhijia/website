@@ -1,5 +1,6 @@
 ---
 import Header from '../components/Header.astro';
+import AdminGate from '../components/AdminGate.astro';
 import { SITE } from '../site.config';
 import '../styles/global.css';
 
@@ -20,6 +21,9 @@ const {
   publishedTime,
   noindex = false,
 } = Astro.props;
+
+/** 写作台自己带门禁，不再显示右下角齿轮 */
+const isWritePage = Astro.url.pathname.startsWith('/write');
 
 const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} · ${SITE.tagline}`;
 const canonical = new URL(Astro.url.pathname, SITE.url).href;
@@ -80,12 +84,17 @@ const jsonLd = {
     <meta name="twitter:image" content={ogImage} />
 
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!-- 门禁校验脚本，必须最早加载，供齿轮弹窗和写作台共用 -->
+    <script is:inline src="/auth.js"></script>
   </head>
   <body>
     <Header />
     <main>
       <slot />
     </main>
+
+    {!isWritePage && <AdminGate />}
 
     <script is:inline>
       // 滚动出现动画（无 JS 时内容依然可见）

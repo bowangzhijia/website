@@ -8,7 +8,17 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 ---
 
 <BaseLayout title="写作台" description="发布新文章" noindex>
-  <div class="write">
+  <!-- ---------- 门禁 ---------- -->
+  <div class="lock" data-lock>
+    <div class="wrap lock__inner">
+      <p class="lock__title">请填写生日</p>
+      <input class="lock__input" type="date" data-lock-input />
+      <p class="lock__msg" data-lock-msg></p>
+      <button class="btn btn--primary lock__btn" type="button" data-lock-submit>进入</button>
+    </div>
+  </div>
+
+  <div class="write" data-app hidden>
     <div class="wrap write__inner">
       <a class="write__back" href="/">← 回网站</a>
       <h1 class="write__title">写作台</h1>
@@ -154,6 +164,16 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
       <button class="btn btn--primary btn--publish" type="button" data-publish>发布</button>
       <p class="status" data-status role="status" aria-live="polite"></p>
+
+      <!-- ---------- 文章管理 ---------- -->
+      <details class="manage">
+        <summary class="help__summary">文章管理（编辑 / 删除已发布的文章）</summary>
+        <div class="manage__body">
+          <button class="btn btn--ghost" type="button" data-load-list>加载文章列表</button>
+          <ul class="manage__list" data-list></ul>
+          <p class="manage__msg" data-manage-msg></p>
+        </div>
+      </details>
     </div>
   </div>
 </BaseLayout>
@@ -435,6 +455,234 @@ const defaultColumn = targets[0]?.id ?? 'redian';
         elBtn.disabled = false;
       }
     });
+
+    // ---------- 门禁 ----------
+    var lockEl = $('[data-lock]');
+    var appEl = $('[data-app]');
+    var lockInput = $('[data-lock-input]');
+    var lockMsg = $('[data-lock-msg]');
+    var lockBtn = $('[data-lock-submit]');
+
+    function showApp() {
+      if (lockEl) lockEl.hidden = true;
+      if (appEl) appEl.hidden = false;
+    }
+
+    function submitLock() {
+      if (!window.BowangAuth) {
+        lockMsg.textContent = '脚本加载失败，请刷新页面重试';
+        lockMsg.dataset.state = 'error';
+        return;
+      }
+      lockBtn.disabled = true;
+      lockMsg.textContent = '验证中…';
+      lockMsg.dataset.state = '';
+      window.BowangAuth.check(lockInput.value).then(function (ok) {
+        lockBtn.disabled = false;
+        if (ok) {
+          window.BowangAuth.mark();
+          showApp();
+        } else {
+          lockMsg.textContent = '日期不对，请重新填写';
+          lockMsg.dataset.state = 'error';
+        }
+      });
+    }
+
+    if (lockBtn) {
+      lockBtn.addEventListener('click', submitLock);
+      lockInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') submitLock();
+      });
+      if (window.BowangAuth && window.BowangAuth.unlocked()) showApp();
+    }
+
+    // ---------- 文章管理 ----------
+    var listEl = $('[data-list]');
+    var manageMsg = $('[data-manage-msg]');
+
+    function setManageMsg(text, state) {
+      if (!manageMsg) return;
+      manageMsg.textContent = text || '';
+      manageMsg.dataset.state = state || '';
+    }
+
+    async function errText(res) {
+      try {
+        var j = await res.json();
+        return j.message || 'HTTP ' + res.status;
+      } catch (e) {
+        return 'HTTP ' + res.status;
+      }
+    }
+
+    function fromBase64(b64) {
+      var bin = atob(String(b64).replace(/\n/g, ''));
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+
+    /** 把一篇 Markdown 拆成表单字段 */
+    function parsePost(content) {
+      var m = String(content).match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+      var fm = m ? m[1] : '';
+      var body = m ? m[2] : String(content);
+
+      function get(key) {
+        var r = fm.match(new RegExp('^' + key + ':\\s*(.*)$', 'm'));
+        if (!r) return '';
+        return r[1].trim().replace(/^"(.*)"$/, '$1');
+      }
+
+      return {
+        title: get('title'),
+        summary: get('summary'),
+        date: get('date'),
+        sectors: get('sectors')
+          .replace(/[\[\]]/g, '')
+          .split(',')
+          .map(function (s) {
+            return s.trim();
+          })
+          .filter(Boolean),
+        body: body.replace(/^\s*\n/, '').trim(),
+      };
+    }
+
+    function fillForm(d, fileName) {
+      elTitle.value = d.title || '';
+      elSummary.value = d.summary || '';
+      elDate.value = d.date || fileName.replace(/\.md$/, '');
+      elBody.value = d.body || '';
+      elSectors.forEach(function (c) {
+        c.checked = d.sectors.indexOf(c.value) >= 0;
+      });
+      saveDraftSoon();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function loadList() {
+      if (!getToken()) {
+        setManageMsg('请先设置 GitHub 令牌（点上面的「GitHub 令牌」）', 'error');
+        return;
+      }
+
+      setManageMsg('加载中…', '');
+      listEl.innerHTML = '';
+
+      var res = await fetch(apiUrl(DIR) + '?ref=' + BRANCH + '&t=' + Date.now(), {
+        headers: headers(),
+      });
+      if (!res.ok) {
+        setManageMsg('加载失败：' + (await errText(res)), 'error');
+        return;
+      }
+
+      var files = (await res.json()).filter(function (f) {
+        return /\.md$/.test(f.name);
+      });
+      files.sort(function (a, b) {
+        return b.name.localeCompare(a.name);
+      });
+      files = files.slice(0, 30);
+
+      if (!files.length) {
+        setManageMsg('还没有任何文章', '');
+        return;
+      }
+
+      var items = await Promise.all(
+        files.map(async function (f) {
+          try {
+            var r = await fetch(f.url + '?t=' + Date.now(), { headers: headers() });
+            var j = await r.json();
+            return { name: f.name, sha: f.sha, data: parsePost(fromBase64(j.content)) };
+          } catch (e) {
+            return { name: f.name, sha: f.sha, data: null };
+          }
+        })
+      );
+
+      items.forEach(function (item) {
+        var label = (item.data && item.data.title) || item.name.replace(/\.md$/, '');
+
+        var li = document.createElement('li');
+        li.className = 'mitem';
+
+        var info = document.createElement('div');
+        info.className = 'mitem__info';
+        var b = document.createElement('b');
+        b.textContent = label;
+        var meta = document.createElement('span');
+        var parts = [item.name.replace(/\.md$/, '')];
+        if (item.data && item.data.sectors.length) parts.push(item.data.sectors.join(' / '));
+        meta.textContent = parts.join('　');
+        info.appendChild(b);
+        info.appendChild(meta);
+
+        var acts = document.createElement('div');
+        acts.className = 'mitem__acts';
+
+        var edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'btn btn--mini';
+        edit.textContent = '编辑';
+        edit.addEventListener('click', function () {
+          if (!item.data) {
+            setManageMsg('这篇读取失败了，请重新加载', 'error');
+            return;
+          }
+          fillForm(item.data, item.name);
+          setManageMsg('已载入「' + label + '」，改完点上面的「发布」即可覆盖', 'ok');
+        });
+
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'btn btn--mini btn--danger';
+        del.textContent = '删除';
+        del.addEventListener('click', async function () {
+          if (!confirm('确定删除「' + label + '」吗？\n\n网站约 1 分钟后更新。这一步不可撤销，但 Git 里留有历史记录。'))
+            return;
+          del.disabled = true;
+          setManageMsg('正在删除…', '');
+          try {
+            var r = await fetch(apiUrl(DIR + '/' + item.name), {
+              method: 'DELETE',
+              headers: Object.assign({ 'content-type': 'application/json' }, headers()),
+              body: JSON.stringify({
+                message: '删除：' + label,
+                sha: item.sha,
+                branch: BRANCH,
+              }),
+            });
+            if (!r.ok) throw new Error(await errText(r));
+            li.remove();
+            setManageMsg('已删除「' + label + '」，约 1 分钟后网站更新', 'ok');
+          } catch (e) {
+            del.disabled = false;
+            setManageMsg('删除失败：' + (e && e.message ? e.message : e), 'error');
+          }
+        });
+
+        acts.appendChild(edit);
+        acts.appendChild(del);
+        li.appendChild(info);
+        li.appendChild(acts);
+        listEl.appendChild(li);
+      });
+
+      setManageMsg('共 ' + items.length + ' 篇（最多列出最近 30 篇）', '');
+    }
+
+    var loadBtn = $('[data-load-list]');
+    if (loadBtn) {
+      loadBtn.addEventListener('click', function () {
+        loadList().catch(function (e) {
+          setManageMsg('加载失败：' + (e && e.message ? e.message : e), 'error');
+        });
+      });
+    }
 
     refreshTokenState();
   })();
@@ -835,5 +1083,158 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     .help__body {
       font-size: 13.5px;
     }
+    .mitem {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mitem__info b {
+      white-space: normal;
+    }
+  }
+
+  /* hidden 属性会被 display:flex 盖掉，这里显式补回来 */
+  .write[hidden],
+  .lock[hidden] {
+    display: none;
+  }
+
+  /* ---------- 门禁 ---------- */
+  .lock {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+  }
+
+  .lock__inner {
+    max-width: 320px;
+    text-align: center;
+  }
+
+  .lock__title {
+    margin: 0 0 18px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .lock__input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    text-align: center;
+    outline: none;
+  }
+
+  .lock__input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .lock__msg {
+    min-height: 20px;
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .lock__msg[data-state='error'] {
+    color: var(--up);
+  }
+
+  .lock__btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 13px;
+  }
+
+  /* ---------- 文章管理 ---------- */
+  .manage {
+    margin-top: 26px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    overflow: hidden;
+  }
+
+  .manage__body {
+    padding: 4px 15px 16px;
+  }
+
+  .manage__list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mitem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+  }
+
+  .mitem + .mitem {
+    border-top: 1px solid var(--border);
+  }
+
+  .mitem__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mitem__info b {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mitem__info span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .mitem__acts {
+    display: flex;
+    gap: 6px;
+    flex: none;
+  }
+
+  .btn--danger {
+    color: var(--up);
+    border-color: color-mix(in srgb, var(--up) 40%, transparent);
+  }
+
+  .btn--danger:hover {
+    background: color-mix(in srgb, var(--up) 12%, transparent);
+  }
+
+  .manage__msg {
+    min-height: 20px;
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .manage__msg[data-state='ok'] {
+    color: var(--down);
+  }
+
+  .manage__msg[data-state='error'] {
+    color: var(--up);
   }
 </style>
