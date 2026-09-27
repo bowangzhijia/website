@@ -20,7 +20,10 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
   <div class="write" data-app hidden>
     <div class="wrap write__inner">
-      <a class="write__back" href="/">← 回网站</a>
+      <div class="write__top">
+        <a class="write__back" href="/">← 回网站</a>
+        <button class="write__out" type="button" data-signout>退出设置</button>
+      </div>
       <h1 class="write__title">写作台</h1>
       <p class="write__hint">
         填完点发布，约 1 分钟后网站更新。内容自动存在这台设备上，关掉页面也不会丢。
@@ -497,6 +500,15 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       if (window.BowangAuth && window.BowangAuth.unlocked()) showApp();
     }
 
+    var signoutBtn = $('[data-signout]');
+    if (signoutBtn) {
+      signoutBtn.addEventListener('click', function () {
+        if (!confirm('退出后，这台设备下次进入需要重新填生日。确定吗？')) return;
+        if (window.BowangAuth) window.BowangAuth.lock();
+        location.href = '/';
+      });
+    }
+
     // ---------- 文章管理 ----------
     var listEl = $('[data-list]');
     var manageMsg = $('[data-manage-msg]');
@@ -698,15 +710,37 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     max-width: 660px;
   }
 
-  .write__back {
-    display: inline-block;
+  .write__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 14px;
+  }
+
+  .write__back {
     font-size: 13px;
     color: var(--muted);
   }
 
   .write__back:hover {
     color: var(--accent);
+  }
+
+  .write__out {
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .write__out:hover {
+    color: var(--up);
+    border-color: color-mix(in srgb, var(--up) 40%, transparent);
   }
 
   .write__title {
