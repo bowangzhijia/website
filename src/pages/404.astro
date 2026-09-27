@@ -1,0 +1,59 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { COLUMNS } from '../site.config';
+---
+
+<BaseLayout title="页面不存在" description="页面不存在。">
+  <section class="nf">
+    <div class="wrap wrap--narrow">
+      <p class="nf__code">404</p>
+      <h1 class="nf__title">页面不存在</h1>
+
+      <div class="nf__actions">
+        <a class="btn btn--primary" href="/">回首页</a>
+        {
+          COLUMNS.map((column) => (
+            <a class="btn" href={`/columns/${column.id}/`}>
+              {column.name}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .wrap--narrow {
+    max-width: 660px;
+  }
+
+  .nf {
+    padding: 96px 0 40px;
+    text-align: center;
+  }
+
+  .nf__code {
+    font-family: var(--font-mono);
+    font-size: 68px;
+    font-weight: 800;
+    line-height: 1;
+    margin: 0 0 8px;
+    background: linear-gradient(120deg, var(--accent), var(--grad-text-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .nf__title {
+    font-size: clamp(22px, 3.4vw, 30px);
+    margin-bottom: 28px;
+  }
+
+  .nf__actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+</style>

@@ -1,0 +1,295 @@
+---
+import { SITE, COLUMNS } from '../site.config';
+
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
+
+const items = [
+  { label: '首页', href: '/', active: path === '/' },
+  ...COLUMNS.map((column) => {
+    const href = `/columns/${column.id}/`;
+    return {
+      label: column.name,
+      href,
+      active: path === href.replace(/\/+$/, ''),
+    };
+  }),
+];
+---
+
+<header class="hd">
+  <div class="wrap hd__inner">
+    <a class="hd__brand" href="/">
+      <span class="hd__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="17" height="17" fill="none">
+          <path
+            d="M3 21.5l6.5-7 5 4.5L29 8"
+            stroke="currentColor"
+            stroke-width="3.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+      </span>
+      <span class="hd__name">{SITE.name}</span>
+    </a>
+
+    <div class="hd__right">
+      <nav class="hd__nav" aria-label="主导航">
+        {
+          items.map((item) => (
+            <a href={item.href} class={item.active ? 'is-active' : ''}>
+              {item.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <button
+        class="tt"
+        type="button"
+        data-theme-toggle
+        aria-label="切换到深色主题"
+        title="切换深浅色主题"
+      >
+        <svg
+          class="tt__icon tt__icon--sun"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="4.2"></circle>
+          <path
+            d="M12 2.6v2.1M12 19.3v2.1M2.6 12h2.1M19.3 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"
+          ></path>
+        </svg>
+        <svg
+          class="tt__icon tt__icon--moon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20.6 14.7A8.7 8.7 0 0 1 9.3 3.4a8.7 8.7 0 1 0 11.3 11.3z"></path>
+        </svg>
+      </button>
+
+      <input
+        class="hd__toggle"
+        type="checkbox"
+        id="nav-toggle"
+        aria-label="展开导航"
+      />
+      <label class="hd__burger" for="nav-toggle" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </label>
+    </div>
+  </div>
+</header>
+
+<style>
+  .hd {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--header-bg);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hd__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    height: 64px;
+  }
+
+  .hd__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text);
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .hd__brand:hover {
+    color: var(--text);
+  }
+
+  .hd__mark {
+    display: grid;
+    place-items: center;
+    width: 29px;
+    height: 29px;
+    border-radius: 9px;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+    box-shadow: 0 5px 16px var(--accent-glow);
+  }
+
+  .hd__right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .hd__nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .hd__nav a {
+    position: relative;
+    color: var(--text-dim);
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 9px 12px;
+    white-space: nowrap;
+    transition: color 0.18s ease;
+  }
+
+  .hd__nav a::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .hd__nav a:hover {
+    color: var(--text);
+  }
+
+  .hd__nav a.is-active {
+    color: var(--text);
+  }
+
+  .hd__nav a.is-active::after {
+    transform: scaleX(1);
+  }
+
+  /* ---------- 主题切换 ---------- */
+  .tt {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .tt:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .tt__icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  .tt__icon--sun {
+    display: none;
+  }
+
+  html[data-theme='dark'] .tt__icon--sun {
+    display: block;
+  }
+
+  html[data-theme='dark'] .tt__icon--moon {
+    display: none;
+  }
+
+  .hd__toggle,
+  .hd__burger {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .hd__burger {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 34px;
+      height: 34px;
+      padding: 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .hd__burger span {
+      display: block;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+    }
+
+    .hd__name {
+      font-size: 15px;
+    }
+
+    .hd__nav {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 64px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      padding: 8px 18px 16px;
+      background: var(--nav-sheet-bg);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transform: translateY(-12px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    }
+
+    .hd__nav a {
+      padding: 12px 10px;
+      font-size: 16px;
+      border-radius: 8px;
+    }
+
+    .hd__nav a::after {
+      display: none;
+    }
+
+    .hd__nav a.is-active {
+      color: var(--accent);
+      background: var(--hover-fill);
+    }
+
+    .hd__right:has(.hd__toggle:checked) .hd__nav {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+  }
+</style>

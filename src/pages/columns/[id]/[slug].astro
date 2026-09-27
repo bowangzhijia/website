@@ -1,0 +1,250 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SubscribeForm from '../../../components/SubscribeForm.astro';
+import { RISK_NOTE } from '../../../site.config';
+import {
+  formatDateCN,
+  formatDateISO,
+  getColumn,
+  sectorNames,
+  sortByDateDesc,
+  type Post,
+} from '../../../utils/posts';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  return posts.map((post) => ({
+    params: { id: post.data.column, slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props as { post: Post };
+const { Content } = await render(post);
+
+const column = getColumn(post.data.column);
+const tags = sectorNames(post.data.sectors);
+
+/** 同栏目下按日期排好，用来取上/下一期 */
+const siblings = sortByDateDesc(
+  await getCollection('posts', ({ data }) => data.column === post.data.column)
+);
+const at = siblings.findIndex((item) => item.id === post.id);
+const newer = at > 0 ? siblings[at - 1] : null;
+const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.summary || column?.desc}
+  type="article"
+  publishedTime={post.data.date.toISOString()}
+>
+  <article class="art">
+    <div class="wrap art__inner">
+      <a class="art__back" href={`/columns/${post.data.column}/`}>
+        ← {column?.name ?? '返回'}
+      </a>
+
+      <header class="art__head">
+        <time class="art__date" datetime={formatDateISO(post.data.date)}>
+          {formatDateCN(post.data.date)}
+        </time>
+        <h1 class="art__title">{post.data.title}</h1>
+        {post.data.summary && <p class="art__summary">{post.data.summary}</p>}
+        {
+          tags.length > 0 && (
+            <ul class="art__tags">
+              {tags.map((tag) => (
+                <li>{tag}</li>
+              ))}
+            </ul>
+          )
+        }
+      </header>
+
+      {post.data.audio && <audio class="art__audio" controls preload="none" src={post.data.audio} />}
+
+      <div class="prose">
+        <Content />
+      </div>
+
+      <p class="risk">{RISK_NOTE}</p>
+
+      {
+        (older || newer) && (
+          <nav class="art__nav">
+            {older ? (
+              <a class="art__nav-item" href={`/columns/${post.data.column}/${older.id}/`}>
+                <span class="art__nav-label">上一期</span>
+                <span class="art__nav-title">{older.data.title}</span>
+              </a>
+            ) : (
+              <span />
+            )}
+            {newer ? (
+              <a class="art__nav-item art__nav-item--right" href={`/columns/${post.data.column}/${newer.id}/`}>
+                <span class="art__nav-label">下一期</span>
+                <span class="art__nav-title">{newer.data.title}</span>
+              </a>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )
+      }
+
+      <div class="art__sub">
+        <SubscribeForm />
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .art {
+    flex: 1;
+    padding: 34px 0 56px;
+  }
+
+  .art__inner {
+    max-width: 720px;
+  }
+
+  .art__back {
+    display: inline-block;
+    margin-bottom: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .art__back:hover {
+    color: var(--accent);
+  }
+
+  .art__head {
+    margin-bottom: 26px;
+  }
+
+  .art__date {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .art__title {
+    font-size: clamp(23px, 3.4vw, 31px);
+    letter-spacing: -0.03em;
+    line-height: 1.35;
+    margin: 0 0 10px;
+  }
+
+  .art__summary {
+    color: var(--text-dim);
+    font-size: 14.5px;
+    line-height: 1.75;
+    margin: 0;
+  }
+
+  .art__tags {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 14px 0 0;
+    padding: 0;
+  }
+
+  .art__tags li {
+    padding: 3px 11px;
+    border-radius: 999px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .art__audio {
+    width: 100%;
+    margin-bottom: 26px;
+  }
+
+  .risk {
+    margin: 26px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* ---------- 上一期 / 下一期 ---------- */
+  .art__nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .art__nav-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 13px 15px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    min-width: 0;
+    transition: border-color 0.16s ease, transform 0.16s ease;
+  }
+
+  .art__nav-item:hover {
+    color: var(--text);
+    border-color: var(--accent-border);
+    transform: translateY(-2px);
+  }
+
+  .art__nav-item--right {
+    text-align: right;
+  }
+
+  .art__nav-label {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .art__nav-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .art__sub {
+    max-width: 520px;
+    margin-top: 38px;
+  }
+
+  @media (max-width: 640px) {
+    .art {
+      padding: 20px 0 40px;
+    }
+    .art__back {
+      margin-bottom: 14px;
+    }
+    .art__head {
+      margin-bottom: 20px;
+    }
+    .art__nav {
+      grid-template-columns: 1fr;
+    }
+    .art__nav-item--right {
+      text-align: left;
+    }
+    .art__sub {
+      margin-top: 28px;
+    }
+  }
+</style>

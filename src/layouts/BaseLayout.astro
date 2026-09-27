@@ -1,0 +1,138 @@
+---
+import Header from '../components/Header.astro';
+import { SITE } from '../site.config';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** 页面类型，用于结构化数据 */
+  type?: 'website' | 'article';
+  publishedTime?: string;
+}
+
+const {
+  title,
+  description = SITE.description,
+  type = 'website',
+  publishedTime,
+} = Astro.props;
+
+const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} · ${SITE.tagline}`;
+const canonical = new URL(Astro.url.pathname, SITE.url).href;
+const ogImage = new URL(SITE.ogImage, SITE.url).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': type === 'article' ? 'BlogPosting' : 'WebSite',
+  name: SITE.name,
+  headline: pageTitle,
+  description,
+  url: canonical,
+  inLanguage: 'zh-CN',
+  author: { '@type': 'Person', name: SITE.author },
+};
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- 主题引导：必须早于首屏绘制，否则会出现主题闪烁。默认浅色，无需设置属性 -->
+    <script is:inline>
+      (function () {
+        try {
+          if (localStorage.getItem('etf-theme') === 'dark') {
+            document.documentElement.dataset.theme = 'dark';
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#07090e');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content={SITE.author} />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="zh_CN" />
+    {publishedTime && <meta property="article:published_time" content={publishedTime} />}
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body>
+    <Header />
+    <main>
+      <slot />
+    </main>
+
+    <script is:inline>
+      // 滚动出现动画（无 JS 时内容依然可见）
+      document.documentElement.classList.add('js-ready');
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              io.unobserve(entry.target);
+            }
+          });
+        },
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.05 }
+      );
+      document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+      // 主题切换
+      var root = document.documentElement;
+      document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+          root.classList.add('theme-switching');
+          if (next === 'dark') {
+            root.dataset.theme = 'dark';
+          } else {
+            delete root.dataset.theme;
+          }
+          try {
+            localStorage.setItem('etf-theme', next);
+          } catch (e) {}
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', next === 'dark' ? '#07090e' : '#ffffff');
+          btn.setAttribute(
+            'aria-label',
+            next === 'dark' ? '切换到浅色主题' : '切换到深色主题'
+          );
+          setTimeout(function () {
+            root.classList.remove('theme-switching');
+          }, 320);
+        });
+      });
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  /* 仅在 JS 可用时才隐藏带动画的元素，避免无 JS 环境白屏 */
+  html:not(.js-ready) .reveal {
+    opacity: 1;
+    transform: none;
+  }
+</style>

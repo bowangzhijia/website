@@ -1,0 +1,267 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SubscribeForm from '../components/SubscribeForm.astro';
+import { SITE, COLUMNS, WELCOME, RISK_NOTE } from '../site.config';
+
+const pageTitle = SITE.tagline;
+---
+
+<BaseLayout title={pageTitle}>
+  <section class="home">
+    <div class="wrap home__inner">
+      <span class="home__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="24" height="24" fill="none">
+          <path
+            d="M3 21.5l6.5-7 5 4.5L29 8"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+      </span>
+
+      <h1 class="home__title">{SITE.name}</h1>
+      <p class="home__welcome">{WELCOME.body}</p>
+
+      <div class="home__sub">
+        <SubscribeForm />
+      </div>
+
+      <nav class="home__cols" aria-label="栏目入口">
+        {
+          COLUMNS.map((column, index) => (
+            <a
+              class="entry"
+              href={`/columns/${column.id}/`}
+              style={`--c1:${column.color[0]};--c2:${column.color[1]}`}
+            >
+              <span class="entry__head" aria-hidden="true">
+                <span class="entry__index">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span class="entry__go">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+                    <path
+                      d="M3 8h10M9 4l4 4-4 4"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+              </span>
+              <span class="entry__name">{column.name}</span>
+              <span class="entry__tagline">{column.tagline}</span>
+            </a>
+          ))
+        }
+      </nav>
+
+      <p class="home__risk">{RISK_NOTE}</p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* 撑满剩余高度、内容垂直居中，一屏不出现滚动条 */
+  .home {
+    position: relative;
+    flex: 1;
+    display: flex;
+    padding: 26px 0;
+  }
+
+  /* 点阵底纹，用遮罩让它自然消失 */
+  .home::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 74% 66% at 50% 44%, #000, transparent 78%);
+    mask-image: radial-gradient(ellipse 74% 66% at 50% 44%, #000, transparent 78%);
+    pointer-events: none;
+  }
+
+  .home__inner {
+    /* margin-block:auto 居中；内容溢出时自动退化为 0，顶部仍可见 */
+    margin-block: auto;
+    width: 100%;
+    text-align: center;
+  }
+
+  .home__mark {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 16px;
+    border-radius: 14px;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+    box-shadow: 0 14px 36px var(--accent-glow);
+  }
+
+  .home__title {
+    font-size: clamp(30px, 4.6vw, 42px);
+    letter-spacing: -0.035em;
+    margin-bottom: 8px;
+  }
+
+  .home__welcome {
+    color: var(--text);
+    font-size: 15.5px;
+    line-height: 1.75;
+    max-width: 520px;
+    margin: 0 auto 22px;
+  }
+
+  .home__sub {
+    max-width: 520px;
+    margin: 0 auto 24px;
+    text-align: left;
+  }
+
+  /* ---------- 栏目入口 ---------- */
+  .home__cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+    gap: 12px;
+    max-width: 780px;
+    margin: 0 auto;
+    text-align: left;
+  }
+
+  .entry {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    overflow: hidden;
+    transition: transform 0.24s cubic-bezier(0.2, 0.7, 0.3, 1),
+      border-color 0.24s ease, box-shadow 0.24s ease;
+  }
+
+  /* 顶部彩色强调条，hover 时从左展开 */
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--c1), var(--c2));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.32s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .entry:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--c1) 42%, var(--border));
+    box-shadow: var(--shadow);
+    color: var(--text);
+  }
+
+  .entry:hover::before {
+    transform: scaleX(1);
+  }
+
+  .entry__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .entry__index {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .entry__go {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: transform 0.24s ease, color 0.24s ease,
+      border-color 0.24s ease, background 0.24s ease;
+  }
+
+  .entry:hover .entry__go {
+    transform: translateX(3px);
+    color: var(--on-accent);
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+  }
+
+  .entry__name {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+  }
+
+  .entry__tagline {
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .home__risk {
+    margin: 20px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .home {
+      padding: 16px 0;
+    }
+    .home__mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .home__title {
+      font-size: 26px;
+    }
+    .home__welcome {
+      font-size: 13.5px;
+      line-height: 1.65;
+      margin-bottom: 16px;
+    }
+    .home__sub {
+      margin-bottom: 16px;
+    }
+    .home__cols {
+      grid-template-columns: 1fr;
+      gap: 9px;
+    }
+    /* 手机上收起编号与箭头，保证一屏放得下 */
+    .entry {
+      padding: 14px 18px;
+    }
+    .entry__head {
+      display: none;
+    }
+    .entry__name {
+      font-size: 16px;
+    }
+    .home__risk {
+      margin-top: 14px;
+    }
+  }
+</style>

@@ -1,0 +1,19 @@
+name = "bowangzhijia"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "dist"
+
+# ---------------------------------------------------------------
+# 订阅邮箱数据库（Cloudflare D1，免费额度足够个人站使用）
+#
+# 创建步骤：
+#   npx wrangler d1 create etf-subscribers
+# 把命令返回的 database_id 填到下面，然后重新构建部署
+# ---------------------------------------------------------------
+[[d1_databases]]
+binding = "SUBSCRIBERS_DB"
+database_name = "etf-subscribers"
+database_id = "895e1705-de11-4aaa-b70c-23fff572aac9"
+
+# 敏感值请用 `npx wrangler pages secret put <名字>` 配置，不要写在这里
+# [vars]
+# MAIL_FROM = "波王之家 <noreply@bowangzhijia.com>"

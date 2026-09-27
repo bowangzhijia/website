@@ -1,0 +1,85 @@
+---
+import type { Platform } from '../site.config';
+
+interface Props {
+  /** 要展示的平台（按栏目筛选后传入） */
+  items: Platform[];
+}
+
+const { items } = Astro.props;
+---
+
+<ul class="pl">
+  {
+    items.map((p) => (
+      <li>
+        <a
+          class="pl__item"
+          href={p.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`${p.name} ${p.handle}`}
+          aria-label={`${p.name} ${p.handle}`}
+          style={`--c1:${p.color[0]};--c2:${p.color[1]}`}
+        >
+          <span class="pl__badge" aria-hidden="true">
+            {p.badge}
+          </span>
+          <span class="pl__name">{p.name}</span>
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .pl {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(106px, 100%), 1fr));
+    gap: 8px;
+  }
+
+  .pl__item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    min-width: 0;
+    transition: transform 0.16s ease, border-color 0.16s ease;
+  }
+
+  .pl__item:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--c1) 50%, var(--border));
+    color: var(--text);
+  }
+
+  .pl__badge {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 24px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+    color: var(--badge-fg);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .pl__name {
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>

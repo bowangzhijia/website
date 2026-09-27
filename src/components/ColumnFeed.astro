@@ -1,0 +1,278 @@
+---
+import { SECTORS } from '../site.config';
+import { formatDateMD, sectorNames, type Post } from '../utils/posts';
+
+interface Props {
+  posts: Post[];
+  /** 栏目 id，用来拼文章链接 */
+  columnId: string;
+}
+
+const { posts, columnId } = Astro.props;
+
+/** 只有被文章用到的行业才显示筛选按钮，避免点进去全是空的 */
+const usedSectors = SECTORS.filter((sector) =>
+  posts.some((post) => post.data.sectors.includes(sector.id))
+);
+---
+
+<div class="feed" data-feed>
+  {
+    usedSectors.length > 0 && (
+      <div class="feed__filter" role="group" aria-label="按行业筛选">
+        <button type="button" class="chip is-on" data-sector="all">
+          全部
+        </button>
+        {usedSectors.map((sector) => (
+          <button type="button" class="chip" data-sector={sector.id}>
+            {sector.name}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  <ul class="feed__list">
+    {
+      posts.map((post) => (
+        <li class="item" data-sectors={post.data.sectors.join('|')}>
+          <a class="item__link" href={`/columns/${columnId}/${post.id}/`}>
+            <time class="item__date" datetime={post.data.date.toISOString()}>
+              {formatDateMD(post.data.date)}
+            </time>
+
+            <span class="item__main">
+              <span class="item__title">{post.data.title}</span>
+              {post.data.summary && (
+                <span class="item__summary">{post.data.summary}</span>
+              )}
+              {sectorNames(post.data.sectors).length > 0 && (
+                <span class="item__tags">
+                  {sectorNames(post.data.sectors).map((name) => (
+                    <span class="item__tag">{name}</span>
+                  ))}
+                </span>
+              )}
+            </span>
+
+            <span class="item__go" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none">
+                <path
+                  d="M3 8h10M9 4l4 4-4 4"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  <p class="feed__empty" data-empty hidden>这个行业还没有内容。</p>
+</div>
+
+<script>
+  document.querySelectorAll('[data-feed]').forEach((root) => {
+    const chips = Array.from(root.querySelectorAll('.chip'));
+    const items = Array.from(root.querySelectorAll('.item'));
+    const empty = root.querySelector('[data-empty]');
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const target = chip.getAttribute('data-sector') || 'all';
+
+        chips.forEach((c) => {
+          c.classList.toggle('is-on', c === chip);
+          c.setAttribute('aria-pressed', String(c === chip));
+        });
+
+        let shown = 0;
+        items.forEach((item) => {
+          const list = (item.getAttribute('data-sectors') || '').split('|');
+          const match = target === 'all' || list.includes(target);
+          item.classList.toggle('is-hide', !match);
+          if (match) shown += 1;
+        });
+
+        if (empty) {
+          if (shown === 0) {
+            empty.removeAttribute('hidden');
+          } else {
+            empty.setAttribute('hidden', '');
+          }
+        }
+      });
+    });
+  });
+</script>
+
+<style>
+  .feed__filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 22px;
+  }
+
+  .chip {
+    padding: 5px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12.5px;
+    line-height: 1.7;
+    cursor: pointer;
+    transition: color 0.16s ease, border-color 0.16s ease,
+      background 0.16s ease;
+  }
+
+  .chip:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-tint);
+  }
+
+  .chip.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 700;
+  }
+
+  /* ---------- 列表 ---------- */
+  .feed__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .item.is-hide {
+    display: none;
+  }
+
+  .item + .item .item__link {
+    border-top: 1px solid var(--border);
+  }
+
+  .item__link {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 4px;
+    color: var(--text);
+    transition: background 0.16s ease;
+  }
+
+  .item__link:hover {
+    color: var(--text);
+    background: var(--hover-fill);
+  }
+
+  .item__date {
+    flex: none;
+    width: 48px;
+    padding-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .item__main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .item__title {
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
+  }
+
+  .item__summary {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.65;
+  }
+
+  .item__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 1px;
+  }
+
+  .item__tag {
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 11.5px;
+    line-height: 1.75;
+  }
+
+  .item__go {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-top: 2px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: transform 0.18s ease, color 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  .item__link:hover .item__go {
+    transform: translateX(3px);
+    color: var(--accent);
+    border-color: var(--accent-border);
+  }
+
+  .feed__empty {
+    margin: 22px 0 0;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .feed__filter {
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .chip {
+      padding: 4px 11px;
+      font-size: 12px;
+    }
+    .item__link {
+      gap: 11px;
+      padding: 14px 2px;
+    }
+    .item__date {
+      width: 42px;
+      font-size: 12px;
+    }
+    .item__title {
+      font-size: 15px;
+    }
+    .item__summary {
+      font-size: 13px;
+    }
+    .item__go {
+      display: none;
+    }
+  }
+</style>

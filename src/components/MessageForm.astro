@@ -1,0 +1,160 @@
+---
+import { MESSAGE } from '../site.config';
+---
+
+<form class="msg" data-endpoint={MESSAGE.endpoint} novalidate>
+  <label class="sr-only" for="msg-email">你的邮箱</label>
+  <input
+    id="msg-email"
+    name="email"
+    type="email"
+    inputmode="email"
+    autocomplete="email"
+    placeholder={MESSAGE.emailPlaceholder}
+    required
+  />
+
+  <label class="sr-only" for="msg-body">留言内容</label>
+  <textarea
+    id="msg-body"
+    name="message"
+    rows="4"
+    maxlength={MESSAGE.maxLength}
+    placeholder={MESSAGE.messagePlaceholder}
+    required></textarea>
+
+  <button class="btn btn--primary btn--block" type="submit">
+    {MESSAGE.button}
+  </button>
+</form>
+<p class="msg__status" data-msg role="status" aria-live="polite"></p>
+
+<script is:inline>
+  const MSG_OK = '已发送，感谢。';
+  const MSG_FAIL = '发送失败，请稍后再试。';
+
+  document.querySelectorAll('form.msg').forEach((form) => {
+    const status = form.nextElementSibling;
+    const emailInput = form.querySelector('input[type="email"]');
+    const bodyInput = form.querySelector('textarea');
+    const button = form.querySelector('button');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const email = (emailInput.value || '').trim();
+      const message = (bodyInput.value || '').trim();
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        status.textContent = '请填写有效的邮箱地址。';
+        status.dataset.state = 'error';
+        emailInput.focus();
+        return;
+      }
+      if (message.length < 2) {
+        status.textContent = '留言内容太短了。';
+        status.dataset.state = 'error';
+        bodyInput.focus();
+        return;
+      }
+
+      button.disabled = true;
+      status.textContent = '';
+      status.dataset.state = '';
+
+      try {
+        const res = await fetch(form.dataset.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, message, source: location.pathname }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+
+        status.textContent = MSG_OK;
+        status.dataset.state = 'ok';
+        form.reset();
+      } catch (err) {
+        status.textContent = MSG_FAIL;
+        status.dataset.state = 'error';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .msg input,
+  .msg textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+    line-height: 1.6;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .msg textarea {
+    min-height: 96px;
+  }
+
+  .msg input::placeholder,
+  .msg textarea::placeholder {
+    color: var(--muted);
+  }
+
+  .msg input:focus,
+  .msg textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .msg__status {
+    min-height: 20px;
+    margin: 10px 0 0;
+    font-size: 13.5px;
+  }
+
+  .msg__status[data-state='ok'] {
+    color: var(--down);
+  }
+
+  .msg__status[data-state='error'] {
+    color: var(--up);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 640px) {
+    /* iOS 上字号小于 16px 的输入框聚焦时会被自动放大 */
+    .msg input,
+    .msg textarea {
+      font-size: 16px;
+    }
+    .msg textarea {
+      min-height: 84px;
+    }
+  }
+</style>

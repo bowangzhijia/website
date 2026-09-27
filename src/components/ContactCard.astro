@@ -1,0 +1,109 @@
+---
+import { SITE } from '../site.config';
+---
+
+<div class="contact">
+  <p class="contact__label">或直接发邮件</p>
+
+  <div class="contact__row">
+    <a class="contact__mail" href={`mailto:${SITE.email}`}>{SITE.email}</a>
+    <button class="contact__copy" type="button" data-copy={SITE.email}>复制</button>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.getAttribute('data-copy') || '';
+      const done = () => {
+        btn.textContent = '已复制';
+        setTimeout(() => {
+          btn.textContent = '复制';
+        }, 1600);
+      };
+
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch (e) {
+          /* 忽略：极老的浏览器 */
+        }
+        ta.remove();
+        done();
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(value).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+    });
+  });
+</script>
+
+<style>
+  .contact {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .contact__label {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .contact__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .contact__mail {
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .contact__copy {
+    flex: none;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12.5px;
+    line-height: 1.8;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }
+
+  .contact__copy:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-tint);
+  }
+
+  @media (max-width: 640px) {
+    .contact {
+      margin-top: 14px;
+    }
+    .contact__mail {
+      font-size: 13px;
+    }
+  }
+</style>

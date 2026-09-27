@@ -1,0 +1,153 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SubscribeForm from '../components/SubscribeForm.astro';
+import { TIERS } from '../site.config';
+---
+
+<BaseLayout title="会员" description="会员方案，筹备中。">
+  <section class="page">
+    <div class="wrap">
+      <h1 class="section-title">会员</h1>
+      <p class="section-sub">筹备中。订阅邮件可收到开通通知，开通前不收费。</p>
+
+      <div class="grid grid--3">
+        {
+          TIERS.map((tier) => (
+            <div class={`tier card${tier.highlight ? ' tier--hot' : ''}`}>
+              {tier.highlight && <span class="tier__flag">筹备中</span>}
+              <p class="tier__name">{tier.name}</p>
+              <p class="tier__price">
+                {tier.price}
+                <span class="tier__period">/ {tier.period}</span>
+              </p>
+              <ul class="tier__list">
+                {tier.features.map((f) => (
+                  <li>
+                    <span class="tick" aria-hidden="true">✓</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <a
+                class={`btn ${tier.highlight ? 'btn--primary' : ''} btn--block`}
+                href={tier.ctaHref}
+              >
+                {tier.cta}
+              </a>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap wrap--narrow">
+      <div id="subscribe"></div>
+      <SubscribeForm />
+      <p class="muted note">
+        付费买的是更细的执行记录和更直接的沟通，不把本该公开的内容挪进付费墙。会员内容同样不构成投资建议。
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .wrap--narrow {
+    max-width: 620px;
+  }
+
+  .page {
+    padding: 52px 0 6px;
+  }
+
+  .tier {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .tier--hot {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 1px var(--accent-ring), var(--shadow);
+  }
+
+  .tier__flag {
+    position: absolute;
+    top: -11px;
+    left: 22px;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+    font-size: 11.5px;
+    font-weight: 800;
+  }
+
+  .tier__name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dim);
+    margin: 0 0 6px;
+  }
+
+  .tier__price {
+    font-size: 30px;
+    font-weight: 800;
+    margin: 0 0 18px;
+    letter-spacing: -0.02em;
+  }
+
+  .tier__period {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .tier__list {
+    list-style: none;
+    margin: 0 0 24px;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .tier__list li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 14.5px;
+    color: var(--text-dim);
+  }
+
+  .tick {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-top: 3px;
+    border-radius: 6px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 800;
+  }
+
+  #subscribe {
+    scroll-margin-top: 90px;
+  }
+
+  .note {
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  @media (max-width: 620px) {
+    .page {
+      padding: 36px 0 6px;
+    }
+  }
+</style>
