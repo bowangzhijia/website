@@ -1,0 +1,76 @@
+- generic [active] [ref=f3e1]:
+  - banner [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - link "波王之家" [ref=f3e4] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f3e9]:
+        - navigation "主导航" [ref=f3e10]:
+          - link "首页" [ref=f3e11] [cursor=pointer]:
+            - /url: /
+          - link "波王热点" [ref=f3e12] [cursor=pointer]:
+            - /url: /columns/redian/
+          - link "ETF基金波段王" [ref=f3e13] [cursor=pointer]:
+            - /url: /columns/etf-boduan-wang/
+          - link "波王茶话会" [ref=f3e14] [cursor=pointer]:
+            - /url: /columns/chahuahui/
+          - link "给波王留言" [ref=f3e15] [cursor=pointer]:
+            - /url: /columns/message/
+        - button "切换到深色主题" [ref=f3e16] [cursor=pointer]
+  - main [ref=f3e19]:
+    - generic [ref=f3e21]:
+      - generic [ref=f3e22]:
+        - heading "波王热点" [level=1] [ref=f3e23]
+        - paragraph [ref=f3e24]: 每日市场热点
+        - paragraph [ref=f3e25]: 大家好，我是波王，为了防止失联，请务必记住我的个人站点，可以留下您的邮箱，有更新会随时通知大家哈
+      - button "＋ 写新文章 波王热点" [ref=f3e26] [cursor=pointer]:
+        - text: ＋ 写新文章
+        - generic [ref=f3e27]: 波王热点
+      - generic [ref=f3e28]:
+        - group "按行业筛选" [ref=f3e29]:
+          - button "全部" [ref=f3e30] [cursor=pointer]
+          - button "AI" [ref=f3e31] [cursor=pointer]
+          - button "大模型" [ref=f3e32] [cursor=pointer]
+          - button "半导体" [ref=f3e33] [cursor=pointer]
+          - button "消费" [ref=f3e34] [cursor=pointer]
+          - button "有色金属" [ref=f3e35] [cursor=pointer]
+          - button "金融" [ref=f3e36] [cursor=pointer]
+        - list [ref=f3e37]:
+          - listitem [ref=f3e38]:
+            - link "09-27 测试2454646 测试 AI" [ref=f3e39] [cursor=pointer]:
+              - /url: /columns/redian/2026-09-27/
+              - time [ref=f3e40]: 09-27
+              - generic [ref=f3e41]:
+                - generic [ref=f3e42]: 测试2454646
+                - generic [ref=f3e43]: 测试
+                - generic [ref=f3e44]: AI
+          - listitem [ref=f3e49]:
+            - link "09-26 21:21 按板块看消息，比按时间看消息有用得多。 消费 有色金属 金融" [ref=f3e50] [cursor=pointer]:
+              - /url: /columns/redian/2026-09-26/
+              - time [ref=f3e51]: 09-26
+              - generic [ref=f3e52]:
+                - generic [ref=f3e53]: 21:21
+                - generic [ref=f3e54]: 按板块看消息，比按时间看消息有用得多。
+                - generic [ref=f3e55]:
+                  - generic [ref=f3e56]: 消费
+                  - generic [ref=f3e57]: 有色金属
+                  - generic [ref=f3e58]: 金融
+          - listitem [ref=f3e62]:
+            - link "09-25 看一个板块时，我会先看哪三个数 涨跌幅是结果，这三个数更接近原因。 AI 半导体 大模型" [ref=f3e63] [cursor=pointer]:
+              - /url: /columns/redian/2026-09-25/
+              - time [ref=f3e64]: 09-25
+              - generic [ref=f3e65]:
+                - generic [ref=f3e66]: 看一个板块时，我会先看哪三个数
+                - generic [ref=f3e67]: 涨跌幅是结果，这三个数更接近原因。
+                - generic [ref=f3e68]:
+                  - generic [ref=f3e69]: AI
+                  - generic [ref=f3e70]: 半导体
+                  - generic [ref=f3e71]: 大模型
+      - generic [ref=f3e75]:
+        - generic [ref=f3e76]:
+          - generic [ref=f3e77]: 邮箱地址
+          - textbox "邮箱地址" [ref=f3e78]:
+            - /placeholder: 你的邮箱地址
+          - button "免费订阅" [ref=f3e79] [cursor=pointer]
+        - status [ref=f3e80]
+      - paragraph [ref=f3e81]: 个人观点，不构成投资建议。
+  - button "设置" [ref=f3e83] [cursor=pointer]

@@ -209,14 +209,30 @@
     post.title = d.title;
   }
 
+  /** 面板是否开着（读 dialog 的 open 属性） */
+  function isOpen() {
+    return panel.hasAttribute('open');
+  }
+
   function showPanel() {
-    panel.hidden = false;
+    // showModal() 会把面板放进浏览器「顶层」，盖住顶栏在内的一切内容
+    try {
+      if (typeof panel.showModal === 'function') panel.showModal();
+      else panel.setAttribute('open', '');
+    } catch (e) {
+      panel.setAttribute('open', '');
+    }
     document.body.style.overflow = 'hidden';
     window.scrollTo({ top: 0 });
   }
 
   function hidePanel() {
-    panel.hidden = true;
+    try {
+      if (typeof panel.close === 'function' && panel.hasAttribute('open')) panel.close();
+      else panel.removeAttribute('open');
+    } catch (e) {
+      panel.removeAttribute('open');
+    }
     document.body.style.overflow = '';
     say('');
   }
@@ -238,7 +254,7 @@
   }
 
   function close() {
-    if (panel.hidden) return;
+    if (!isOpen()) return;
     hidePanel();
     if (historyPushed) {
       historyPushed = false;
@@ -250,10 +266,16 @@
 
   // 按了返回键 / 侧滑返回：只关面板，人留在原来那一页
   window.addEventListener('popstate', function () {
-    if (!panel.hidden) {
+    if (isOpen()) {
       historyPushed = false;
       hidePanel();
     }
+  });
+
+  // Esc：挡掉浏览器默认的关闭，走自己的 close，才能同步历史记录
+  panel.addEventListener('cancel', function (e) {
+    e.preventDefault();
+    close();
   });
 
   function collect() {
@@ -464,7 +486,7 @@
   if (delBtn) delBtn.addEventListener('click', remove);
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !panel.hidden) close();
+    if (e.key === 'Escape' && isOpen()) close();
   });
 
   // 在面板里用 ⌘/Ctrl + Enter 直接保存，电脑上顺手

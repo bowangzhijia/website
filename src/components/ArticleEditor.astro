@@ -66,7 +66,7 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   )
 }
 
-<div class="aedit" data-edit-panel hidden>
+<dialog class="aedit" data-edit-panel>
   <div class="aedit__bar">
     <button class="aedit__cancel" type="button" data-edit-cancel>
       <svg
@@ -143,7 +143,7 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
       </button>
     </div>
   </div>
-</div>
+</dialog>
 
 <script type="application/json" id="article-data" set:html={json}></script>
 <script is:inline set:html={editScript}></script>
@@ -185,17 +185,35 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   }
 
   /* ---------- 全屏编辑面板 ---------- */
+  /*
+   * 用原生 <dialog> + showModal()：浏览器会把它放进「顶层」（top layer），
+   * 永远盖在所有内容之上，不受任何祖先的 transform / 层叠上下文影响。
+   *
+   * 之前用普通 div + position:fixed 出过问题：只要某个祖先产生了层叠上下文
+   * （比如给 main 加一个淡入动画），面板的 z-index 就被关在那个上下文里，
+   * 反而被粘性顶栏压住——看起来就是「不是一个完整图层」。
+   */
   .aedit {
-    position: fixed;
-    inset: 0;
-    z-index: 70;
-    display: flex;
-    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
     background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
   }
 
-  .aedit[hidden] {
+  /* 没打开时（没有 open 属性）什么都不显示 */
+  .aedit:not([open]) {
     display: none;
+  }
+
+  .aedit[open] {
+    display: flex;
+    flex-direction: column;
   }
 
   /*

@@ -156,31 +156,16 @@ body {
   flex-direction: column;
 }
 
+/*
+ * 注意：这里千万不要给 main 加 animation / filter / transform。
+ * 它们会让 main 产生层叠上下文，main 里 z-index 再高的浮层
+ * （编辑面板、齿轮弹窗）都会被外面的粘性顶栏盖住——表现就是
+ * 「编辑面板不是一个完整图层，顶栏压在上面」。
+ */
 main {
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  /* 页面进入的淡入：配合链接预取，切换看起来是「滑出来」而不是「闪一下」。
-     只动 opacity，不动 transform —— transform 会给 fixed 子元素另建包含块，
-     写作台的编辑面板和右下角齿轮就会跑位。
-     也不要加 fill-mode: both —— 动画结束后 main 会长期挂着层叠上下文，
-     编辑面板就会被底部标签栏盖住。 */
-  animation: page-in 0.2s ease;
-}
-
-@keyframes page-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  main {
-    animation: none;
-  }
 }
 
 /* 背景光晕 */
