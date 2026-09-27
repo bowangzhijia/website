@@ -46,7 +46,20 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     <div class="wrap art__inner">
       <div class="art__top">
         <a class="art__back" href={`/columns/${post.data.column}/`}>
-          ← {column?.name ?? '返回'}
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M15 5.5 8 12l7 6.5"></path>
+          </svg>
+          <span class="art__back-name">{column?.name ?? '返回'}</span>
         </a>
         {/* 只有本机存着 GitHub 令牌时才会显示（脚本负责去掉 hidden） */}
         <button class="art__edit" type="button" data-edit-open hidden>编辑这篇</button>
@@ -135,13 +148,36 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     margin-bottom: 20px;
   }
 
+  /*
+   * 和编辑面板里的「← 返回」保持同一种样式：
+   * 有边框、有底色、40px 高的触摸区。纯文字灰链接太不显眼，
+   * 手机上尤其容易找不到。
+   */
   .art__back {
-    font-size: 13.5px;
-    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    height: 40px;
+    padding: 0 14px 0 9px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
   }
 
   .art__back:hover {
     color: var(--accent);
+    border-color: var(--accent-border);
+  }
+
+  /* 栏目名太长（比如「ETF基金波段王」）时省略，别把「编辑这篇」挤出去 */
+  .art__back-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ---------- 就地编辑入口 ---------- */
