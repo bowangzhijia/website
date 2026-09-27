@@ -209,21 +209,52 @@
     post.title = d.title;
   }
 
-  function open() {
-    fill();
+  function showPanel() {
     panel.hidden = false;
     document.body.style.overflow = 'hidden';
     window.scrollTo({ top: 0 });
+  }
+
+  function hidePanel() {
+    panel.hidden = true;
+    document.body.style.overflow = '';
+    say('');
+  }
+
+  /** 面板开着时，手机上的返回手势要先关面板，而不是直接离开页面 */
+  var historyPushed = false;
+
+  function open() {
+    // 先把面板显示出来：万一后面的填充出问题，至少人还能退出去
+    showPanel();
+    fill();
+    try {
+      history.pushState({ bowangEditor: 1 }, '');
+      historyPushed = true;
+    } catch (e) {}
     setTimeout(function () {
       if (elTitle) elTitle.focus();
     }, 80);
   }
 
   function close() {
-    panel.hidden = true;
-    document.body.style.overflow = '';
-    say('');
+    if (panel.hidden) return;
+    hidePanel();
+    if (historyPushed) {
+      historyPushed = false;
+      try {
+        history.back();
+      } catch (e) {}
+    }
   }
+
+  // 按了返回键 / 侧滑返回：只关面板，人留在原来那一页
+  window.addEventListener('popstate', function () {
+    if (!panel.hidden) {
+      historyPushed = false;
+      hidePanel();
+    }
+  });
 
   function collect() {
     return {
