@@ -16,6 +16,14 @@
   var KEY = 'bowang-unlocked';
   var PASS_HASH = 'c707bfb00ad5d8076b8bdf273c431ccebd9517b081fe90d73150f0a2b6e2b1af';
 
+  /**
+   * 永久入口的钥匙。
+   * 访问 /write/?k=这串 就直接进入，不依赖浏览器存储。
+   * 手机浏览器/App 内置浏览器经常会清掉 localStorage，
+   * 所以把带钥匙的地址存成书签最可靠——书签是浏览器自己保管的。
+   */
+  var PERMA_KEY = 'a7f3c2e9d1b6';
+
   function sha256Hex(text) {
     var data = new TextEncoder().encode(text);
     return crypto.subtle.digest('SHA-256', data).then(function (buf) {
@@ -41,13 +49,33 @@
         });
     },
 
-    /** 这台设备是否已经通过（永久记住，换设备才要重填） */
+    /**
+     * 是否可以进入。
+     * 满足任意一条即可：
+     *   ① 网址里带了正确的永久钥匙（最可靠，存成书签用）
+     *   ② 这台设备的浏览器记住了（localStorage）
+     */
     unlocked: function () {
+      try {
+        var m = String(location.search).match(/[?&]k=([A-Za-z0-9]+)/);
+        if (m && m[1] === PERMA_KEY) {
+          try {
+            localStorage.setItem(KEY, '1');
+          } catch (e) {}
+          return true;
+        }
+      } catch (e) {}
+
       try {
         return localStorage.getItem(KEY) === '1';
       } catch (e) {
         return false;
       }
+    },
+
+    /** 给用户保存的永久入口地址 */
+    permalink: function () {
+      return location.origin + '/write/?k=' + PERMA_KEY;
     },
 
     mark: function () {

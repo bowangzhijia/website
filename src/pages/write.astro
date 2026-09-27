@@ -29,6 +29,18 @@ const defaultColumn = targets[0]?.id ?? 'redian';
         填完点发布，约 1 分钟后网站更新。内容自动存在这台设备上，关掉页面也不会丢。
       </p>
 
+      <div class="perm">
+        <div class="perm__row">
+          <span class="perm__label">永久入口</span>
+          <code data-perm-link></code>
+          <button class="btn btn--mini" type="button" data-copy-perm>复制</button>
+        </div>
+        <p class="perm__tip">
+          把这个地址<strong>存成手机书签</strong>，以后点书签直接进，<strong>不用再填生日</strong>。<br />
+          （浏览器有时会自动清掉本地记录，但书签不会——这是最稳的方式）
+        </p>
+      </div>
+
       <!-- ---------- 使用说明 ---------- -->
       <details class="help">
         <summary class="help__summary">使用说明（忘了怎么弄就看这里）</summary>
@@ -500,6 +512,30 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       if (window.BowangAuth && window.BowangAuth.unlocked()) showApp();
     }
 
+    // ---------- 永久入口 ----------
+    var permLink = $('[data-perm-link]');
+    if (permLink && window.BowangAuth && window.BowangAuth.permalink) {
+      permLink.textContent = window.BowangAuth.permalink();
+    }
+
+    var copyPerm = $('[data-copy-perm]');
+    if (copyPerm) {
+      copyPerm.addEventListener('click', function () {
+        var text = permLink ? permLink.textContent : '';
+        var done = function () {
+          copyPerm.textContent = '已复制';
+          setTimeout(function () {
+            copyPerm.textContent = '复制';
+          }, 1600);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(done).catch(done);
+        } else {
+          done();
+        }
+      });
+    }
+
     var signoutBtn = $('[data-signout]');
     if (signoutBtn) {
       signoutBtn.addEventListener('click', function () {
@@ -754,6 +790,48 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     font-size: 13.5px;
     line-height: 1.7;
     margin: 0 0 22px;
+  }
+
+  /* ---------- 永久入口 ---------- */
+  .perm {
+    padding: 12px 15px;
+    border-radius: 12px;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-tint);
+    margin-bottom: 20px;
+  }
+
+  .perm__row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .perm__label {
+    flex: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .perm code {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: var(--input-bg);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .perm__tip {
+    margin: 9px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--text-dim);
   }
 
   /* ---------- 使用说明 ---------- */
