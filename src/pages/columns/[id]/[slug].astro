@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import SubscribeForm from '../../../components/SubscribeForm.astro';
+import ArticleEditor from '../../../components/ArticleEditor.astro';
 import { RISK_NOTE } from '../../../site.config';
 import {
   formatDateCN,
@@ -43,9 +44,13 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
 >
   <article class="art">
     <div class="wrap art__inner">
-      <a class="art__back" href={`/columns/${post.data.column}/`}>
-        ← {column?.name ?? '返回'}
-      </a>
+      <div class="art__top">
+        <a class="art__back" href={`/columns/${post.data.column}/`}>
+          ← {column?.name ?? '返回'}
+        </a>
+        {/* 只有本机存着 GitHub 令牌时才会显示（脚本负责去掉 hidden） */}
+        <button class="art__edit" type="button" data-edit-open hidden>编辑这篇</button>
+      </div>
 
       <header class="art__head">
         <time class="art__date" datetime={formatDateISO(post.data.date)}>
@@ -57,7 +62,7 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
           tags.length > 0 && (
             <ul class="art__tags">
               {tags.map((tag) => (
-                <li>{tag}</li>
+                <li class="art__tag">{tag}</li>
               ))}
             </ul>
           )
@@ -100,6 +105,16 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
       </div>
     </div>
   </article>
+
+  <ArticleEditor
+    column={post.data.column}
+    file={post.id}
+    title={post.data.title}
+    summary={post.data.summary ?? ''}
+    date={formatDateISO(post.data.date)}
+    sectors={post.data.sectors}
+    body={post.body ?? ''}
+  />
 </BaseLayout>
 
 <style>
@@ -112,15 +127,41 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     max-width: 720px;
   }
 
-  .art__back {
-    display: inline-block;
+  .art__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 20px;
+  }
+
+  .art__back {
     font-size: 13.5px;
     color: var(--muted);
   }
 
   .art__back:hover {
     color: var(--accent);
+  }
+
+  /* ---------- 就地编辑入口 ---------- */
+  .art__edit {
+    flex: none;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .art__edit:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: transparent;
   }
 
   .art__head {
@@ -158,7 +199,9 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     padding: 0;
   }
 
-  .art__tags li {
+  /* 就地编辑存完后会用 JS 重建这几个标签，所以必须是全局选择器，
+     否则新建的标签拿不到样式 */
+  :global(.art__tag) {
     padding: 3px 11px;
     border-radius: 999px;
     background: var(--accent-tint);
@@ -231,7 +274,7 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     .art {
       padding: 20px 0 40px;
     }
-    .art__back {
+    .art__top {
       margin-bottom: 14px;
     }
     .art__head {

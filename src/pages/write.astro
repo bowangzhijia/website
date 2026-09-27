@@ -11,8 +11,16 @@ const defaultColumn = targets[0]?.id ?? 'redian';
   <!-- ---------- 门禁 ---------- -->
   <div class="lock" data-lock>
     <div class="wrap lock__inner">
-      <p class="lock__title">请填写生日</p>
-      <input class="lock__input" type="date" data-lock-input />
+      <p class="lock__title">请输入英文名</p>
+      <input
+        class="lock__input"
+        type="text"
+        data-lock-input
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
       <p class="lock__msg" data-lock-msg></p>
       <button class="btn btn--primary lock__btn" type="button" data-lock-submit>进入</button>
     </div>
@@ -28,18 +36,6 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       <p class="write__hint">
         填完点发布，约 1 分钟后网站更新。内容自动存在这台设备上，关掉页面也不会丢。
       </p>
-
-      <div class="perm">
-        <div class="perm__row">
-          <span class="perm__label">永久入口</span>
-          <code data-perm-link></code>
-          <button class="btn btn--mini" type="button" data-copy-perm>复制</button>
-        </div>
-        <p class="perm__tip">
-          把这个地址<strong>存成手机书签</strong>，以后点书签直接进，<strong>不用再填生日</strong>。<br />
-          （浏览器有时会自动清掉本地记录，但书签不会——这是最稳的方式）
-        </p>
-      </div>
 
       <!-- ---------- 使用说明 ---------- -->
       <details class="help">
@@ -99,6 +95,7 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
           <h3 class="help__h">常见问题</h3>
           <div class="help__faq">
+            <p><b>又让我填英文名了</b>——浏览器的本地记录被清掉了（无痕模式、或用微信 / 抖音等 App 打开时比较常见）。重新填一次就好。</p>
             <p><b>提示「请先设置 GitHub 令牌」</b>——令牌没保存成功，或者换了浏览器、清了浏览记录。重新粘贴一次。</p>
             <p><b>提示「令牌无效或已过期」</b>——去 GitHub 重新生成一个，把旧的删掉。</p>
             <p><b>提示「令牌权限不足」</b>——生成令牌时 Contents 权限要选 <code>Read and write</code>。</p>
@@ -356,6 +353,16 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       return 'https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/' + path;
     }
 
+    /**
+     * 给 URL 追加时间戳绕过缓存。
+     * 注意不能用 '?t=' 硬拼：GitHub 返回的 url 里已经带了 ?ref=main，
+     * 再拼一个 ? 会让 ref 变成「main?t=...」，每个文件都返回 404，
+     * 列表里就会全部显示「读取失败」。
+     */
+    function bustCache(url) {
+      return url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+    }
+
     function headers() {
       return {
         authorization: 'Bearer ' + getToken(),
@@ -498,7 +505,7 @@ const defaultColumn = targets[0]?.id ?? 'redian';
           window.BowangAuth.mark();
           showApp();
         } else {
-          lockMsg.textContent = '日期不对，请重新填写';
+          lockMsg.textContent = '不对，再想想';
           lockMsg.dataset.state = 'error';
         }
       });
@@ -512,34 +519,10 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       if (window.BowangAuth && window.BowangAuth.unlocked()) showApp();
     }
 
-    // ---------- 永久入口 ----------
-    var permLink = $('[data-perm-link]');
-    if (permLink && window.BowangAuth && window.BowangAuth.permalink) {
-      permLink.textContent = window.BowangAuth.permalink();
-    }
-
-    var copyPerm = $('[data-copy-perm]');
-    if (copyPerm) {
-      copyPerm.addEventListener('click', function () {
-        var text = permLink ? permLink.textContent : '';
-        var done = function () {
-          copyPerm.textContent = '已复制';
-          setTimeout(function () {
-            copyPerm.textContent = '复制';
-          }, 1600);
-        };
-        if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard.writeText(text).then(done).catch(done);
-        } else {
-          done();
-        }
-      });
-    }
-
     var signoutBtn = $('[data-signout]');
     if (signoutBtn) {
       signoutBtn.addEventListener('click', function () {
-        if (!confirm('退出后，这台设备下次进入需要重新填生日。确定吗？')) return;
+        if (!confirm('退出后，这台设备下次进入需要重新填英文名。确定吗？')) return;
         if (window.BowangAuth) window.BowangAuth.lock();
         location.href = '/';
       });
@@ -643,17 +626,26 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       var items = await Promise.all(
         files.map(async function (f) {
           try {
-            var r = await fetch(f.url + '?t=' + Date.now(), { headers: headers() });
+            var r = await fetch(bustCache(f.url), { headers: headers() });
+            if (!r.ok) {
+              return { name: f.name, sha: f.sha, data: null, err: await errText(r) };
+            }
             var j = await r.json();
-            return { name: f.name, sha: f.sha, data: parsePost(fromBase64(j.content)) };
+            return { name: f.name, sha: f.sha, data: parsePost(fromBase64(j.content)), err: '' };
           } catch (e) {
-            return { name: f.name, sha: f.sha, data: null };
+            return {
+              name: f.name,
+              sha: f.sha,
+              data: null,
+              err: (e && e.message) || '读取失败',
+            };
           }
         })
       );
 
       items.forEach(function (item) {
-        var label = (item.data && item.data.title) || item.name.replace(/\.md$/, '');
+        var fileDate = item.name.replace(/\.md$/, '');
+        var label = (item.data && item.data.title) || fileDate;
 
         var li = document.createElement('li');
         li.className = 'mitem';
@@ -663,9 +655,10 @@ const defaultColumn = targets[0]?.id ?? 'redian';
         var b = document.createElement('b');
         b.textContent = label;
         var meta = document.createElement('span');
-        var parts = [item.name.replace(/\.md$/, '')];
+        var parts = [fileDate];
         if (item.data && item.data.sectors.length) parts.push(item.data.sectors.join(' / '));
-        meta.textContent = parts.join('　');
+        meta.textContent = item.data ? parts.join('　') : '读取失败：' + (item.err || '未知原因');
+        if (!item.data) meta.dataset.state = 'error';
         info.appendChild(b);
         info.appendChild(meta);
 
@@ -674,11 +667,14 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
         var edit = document.createElement('button');
         edit.type = 'button';
-        edit.className = 'btn btn--mini';
+        edit.className = 'mitem__btn';
         edit.textContent = '编辑';
         edit.addEventListener('click', function () {
           if (!item.data) {
-            setManageMsg('这篇读取失败了，请重新加载', 'error');
+            setManageMsg(
+              '「' + fileDate + '」读取失败：' + (item.err || '未知原因') + '。点「加载文章列表」重试。',
+              'error'
+            );
             return;
           }
           fillForm(item.data, item.name);
@@ -687,7 +683,7 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
         var del = document.createElement('button');
         del.type = 'button';
-        del.className = 'btn btn--mini btn--danger';
+        del.className = 'mitem__btn mitem__btn--danger';
         del.textContent = '删除';
         del.addEventListener('click', async function () {
           if (!confirm('确定删除「' + label + '」吗？\n\n网站约 1 分钟后更新。这一步不可撤销，但 Git 里留有历史记录。'))
@@ -790,48 +786,6 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     font-size: 13.5px;
     line-height: 1.7;
     margin: 0 0 22px;
-  }
-
-  /* ---------- 永久入口 ---------- */
-  .perm {
-    padding: 12px 15px;
-    border-radius: 12px;
-    border: 1px solid var(--accent-border);
-    background: var(--accent-tint);
-    margin-bottom: 20px;
-  }
-
-  .perm__row {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    flex-wrap: wrap;
-  }
-
-  .perm__label {
-    flex: none;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent);
-  }
-
-  .perm code {
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 5px 9px;
-    border-radius: 7px;
-    background: var(--input-bg);
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    color: var(--text);
-    word-break: break-all;
-  }
-
-  .perm__tip {
-    margin: 9px 0 0;
-    font-size: 12.5px;
-    line-height: 1.7;
-    color: var(--text-dim);
   }
 
   /* ---------- 使用说明 ---------- */
@@ -1195,14 +1149,6 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     .help__body {
       font-size: 13.5px;
     }
-    .mitem {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .mitem__info b {
-      white-space: normal;
-    }
   }
 
   /* hidden 属性会被 display:flex 盖掉，这里显式补回来 */
@@ -1287,53 +1233,6 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     flex-direction: column;
   }
 
-  .mitem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 0;
-  }
-
-  .mitem + .mitem {
-    border-top: 1px solid var(--border);
-  }
-
-  .mitem__info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .mitem__info b {
-    font-size: 14px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mitem__info span {
-    font-size: 12px;
-    color: var(--muted);
-  }
-
-  .mitem__acts {
-    display: flex;
-    gap: 6px;
-    flex: none;
-  }
-
-  .btn--danger {
-    color: var(--up);
-    border-color: color-mix(in srgb, var(--up) 40%, transparent);
-  }
-
-  .btn--danger:hover {
-    background: color-mix(in srgb, var(--up) 12%, transparent);
-  }
-
   .manage__msg {
     min-height: 20px;
     margin: 12px 0 0;
@@ -1348,5 +1247,94 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 
   .manage__msg[data-state='error'] {
     color: var(--up);
+  }
+</style>
+
+<style is:global>
+  /*
+   * 下面这些必须写成全局样式。
+   * 文章管理的每一项都是 JS 用 createElement 建的，身上没有 Astro 的
+   * 样式作用域标记，写在普通 <style> 里的规则对它们一律无效——表现就是
+   * 标题和日期挤成一行、按钮乱换行。用 .manage__list 开头限制范围，不会漏到别处。
+   */
+  .manage__list .mitem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 0;
+  }
+
+  .manage__list .mitem + .mitem {
+    border-top: 1px solid var(--border);
+  }
+
+  .manage__list .mitem__info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .manage__list .mitem__info b {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .manage__list .mitem__info span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .manage__list .mitem__info span[data-state='error'] {
+    color: var(--up);
+  }
+
+  .manage__list .mitem__acts {
+    display: flex;
+    gap: 6px;
+    flex: none;
+  }
+
+  .manage__list .mitem__btn {
+    padding: 5px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .manage__list .mitem__btn:hover {
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+
+  .manage__list .mitem__btn--danger {
+    color: var(--up);
+    border-color: color-mix(in srgb, var(--up) 40%, transparent);
+  }
+
+  .manage__list .mitem__btn--danger:hover {
+    background: color-mix(in srgb, var(--up) 12%, transparent);
+    color: var(--up);
+  }
+
+  @media (max-width: 640px) {
+    .manage__list .mitem {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .manage__list .mitem__info b {
+      white-space: normal;
+    }
   }
 </style>

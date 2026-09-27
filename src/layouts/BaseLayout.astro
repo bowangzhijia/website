@@ -1,7 +1,9 @@
 ---
 import Header from '../components/Header.astro';
+import TabBar from '../components/TabBar.astro';
 import AdminGate from '../components/AdminGate.astro';
 import { SITE } from '../site.config';
+import authScript from '../scripts/auth.js?raw';
 import '../styles/global.css';
 
 interface Props {
@@ -85,8 +87,12 @@ const jsonLd = {
 
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <!-- 门禁校验脚本，必须最早加载，供齿轮弹窗和写作台共用 -->
-    <script is:inline src="/auth.js"></script>
+    <!--
+      门禁校验脚本，必须最早加载，供齿轮弹窗和写作台共用。
+      这里用 ?raw 直接内联进 HTML：独立文件会被浏览器缓存 4 小时，
+      换了密码却拿到旧脚本，就会出现「密码明明对却说不对」。
+    -->
+    <script is:inline set:html={authScript}></script>
   </head>
   <body>
     <Header />
@@ -94,6 +100,8 @@ const jsonLd = {
       <slot />
     </main>
 
+    {/* 必须放在 Header 之外：顶栏的 backdrop-filter 会给 fixed 元素另建包含块 */}
+    <TabBar />
     {!isWritePage && <AdminGate />}
 
     <script is:inline>

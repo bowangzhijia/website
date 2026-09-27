@@ -1,0 +1,326 @@
+---
+/**
+ * 文章就地编辑面板。
+ *
+ * 平时是隐藏的，本机存着 GitHub 令牌时脚本才会把入口亮出来。
+ * 访客拿到的页面里这块是 hidden 的，而且就算手动打开也提交不了——
+ * 发布需要令牌，令牌只在你自己的浏览器里。
+ */
+import { SECTORS } from '../site.config';
+import editScript from '../scripts/inline-edit.js?raw';
+
+interface Props {
+  /** 文章所属栏目 id */
+  column: string;
+  /** 文件名（不含 .md），就是日期，例如 2026-09-27 */
+  file: string;
+  title: string;
+  summary?: string;
+  /** ISO 日期，例如 2026-09-27 */
+  date: string;
+  sectors: string[];
+  /** Markdown 正文原文 */
+  body: string;
+}
+
+const { column, file, title, summary = '', date, sectors, body } = Astro.props;
+
+const payload = {
+  column,
+  file,
+  title,
+  summary,
+  date,
+  sectors,
+  body,
+  sectorList: SECTORS.map((sector) => ({ id: sector.id, name: sector.name })),
+};
+
+// 正文里可能出现 </script>，转义掉才安全
+const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+---
+
+<div class="aedit" data-edit-panel hidden>
+  <div class="aedit__bar">
+    <button class="aedit__cancel" type="button" data-edit-cancel>取消</button>
+    <span class="aedit__label">编辑这篇文章</span>
+    <span class="aedit__pad" aria-hidden="true"></span>
+  </div>
+
+  <div class="aedit__scroll">
+    <label class="afield">
+      <span class="afield__name">标题</span>
+      <input type="text" data-edit-title autocomplete="off" />
+    </label>
+
+    <label class="afield">
+      <span class="afield__name">摘要<span class="afield__opt">可选</span></span>
+      <input type="text" data-edit-summary autocomplete="off" placeholder="一句话，显示在列表里" />
+    </label>
+
+    <label class="afield">
+      <span class="afield__name">日期<span class="afield__opt">决定网址，改了会换文件</span></span>
+      <input type="date" data-edit-date />
+    </label>
+
+    <div class="afield">
+      <span class="afield__name">行业<span class="afield__opt">可多选</span></span>
+      <div class="aedit__sectors">
+        {
+          SECTORS.map((sector) => (
+            <label class="asector">
+              <input type="checkbox" value={sector.id} data-edit-sector />
+              <span>{sector.name}</span>
+            </label>
+          ))
+        }
+      </div>
+    </div>
+
+    <label class="afield">
+      <span class="afield__name">正文<span class="afield__opt">Markdown</span></span>
+      <textarea data-edit-body rows="18" spellcheck="false"></textarea>
+    </label>
+  </div>
+
+  <div class="aedit__foot">
+    <p class="aedit__msg" data-edit-msg role="status" aria-live="polite"></p>
+    <div class="aedit__acts">
+      <button class="abtn abtn--primary" type="button" data-edit-save>保存并发布</button>
+      <button class="abtn abtn--danger" type="button" data-edit-delete>删除</button>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="article-data" set:html={json}></script>
+<script is:inline set:html={editScript}></script>
+
+<style>
+  /* ---------- 全屏编辑面板 ---------- */
+  .aedit {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  .aedit[hidden] {
+    display: none;
+  }
+
+  .aedit__bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--header-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .aedit__cancel {
+    flex: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .aedit__cancel:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+  }
+
+  .aedit__label {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* 和左边「取消」等宽，标题才能真正居中 */
+  .aedit__pad {
+    flex: none;
+    width: 58px;
+  }
+
+  .aedit__scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 18px 16px 24px;
+  }
+
+  .aedit__scroll > * {
+    max-width: 680px;
+    margin-inline: auto;
+    display: block;
+  }
+
+  /* ---------- 表单 ---------- */
+  .afield {
+    margin-bottom: 16px;
+  }
+
+  .afield__name {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-bottom: 7px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .afield__opt {
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--faint);
+  }
+
+  .aedit input[type='text'],
+  .aedit input[type='date'],
+  .aedit textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: inherit;
+    /* 16px 是底线：小于它 iOS 聚焦时会把整页放大 */
+    font-size: 16px;
+    line-height: 1.65;
+    outline: none;
+  }
+
+  .aedit textarea {
+    min-height: 340px;
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: 14.5px;
+  }
+
+  .aedit input:focus,
+  .aedit textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* ---------- 行业 ---------- */
+  .aedit__sectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .asector {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .asector input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .asector span {
+    display: block;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.6;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  }
+
+  .asector input:checked + span {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 700;
+  }
+
+  /* ---------- 底部操作条 ---------- */
+  .aedit__foot {
+    flex: none;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: var(--header-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .aedit__msg {
+    min-height: 18px;
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .aedit__msg[data-state='ok'] {
+    color: var(--down);
+  }
+
+  .aedit__msg[data-state='error'] {
+    color: var(--up);
+  }
+
+  .aedit__acts {
+    display: flex;
+    gap: 9px;
+    max-width: 680px;
+    margin-inline: auto;
+  }
+
+  .abtn {
+    flex: 1;
+    min-height: 46px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.16s ease;
+  }
+
+  .abtn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .abtn--primary {
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+  }
+
+  .abtn--danger {
+    flex: 0 0 88px;
+    border-color: color-mix(in srgb, var(--up) 40%, transparent);
+    background: transparent;
+    color: var(--up);
+    font-weight: 600;
+  }
+
+  .abtn--danger:hover {
+    background: color-mix(in srgb, var(--up) 10%, transparent);
+  }
+</style>

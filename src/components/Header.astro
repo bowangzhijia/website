@@ -76,16 +76,6 @@ const items = [
           <path d="M20.6 14.7A8.7 8.7 0 0 1 9.3 3.4a8.7 8.7 0 1 0 11.3 11.3z"></path>
         </svg>
       </button>
-
-      <input
-        class="hd__toggle"
-        type="checkbox"
-        id="nav-toggle"
-        aria-label="展开导航"
-      />
-      <label class="hd__burger" for="nav-toggle" aria-hidden="true">
-        <span></span><span></span><span></span>
-      </label>
     </div>
   </div>
 </header>
@@ -222,74 +212,17 @@ const items = [
     display: none;
   }
 
-  .hd__toggle,
-  .hd__burger {
-    display: none;
-  }
-
+  /*
+   * 手机上导航整体挪到底部标签栏（见 TabBar.astro）：
+   * 顶栏只留站名和主题切换，顶栏导航直接藏掉。
+   */
   @media (max-width: 760px) {
-    .hd__burger {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 5px;
-      width: 34px;
-      height: 34px;
-      padding: 8px;
-      border-radius: 9px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-    }
-
-    .hd__burger span {
-      display: block;
-      height: 2px;
-      background: var(--text);
-      border-radius: 2px;
+    .hd__nav {
+      display: none;
     }
 
     .hd__name {
       font-size: 15px;
-    }
-
-    .hd__nav {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 64px;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 2px;
-      padding: 8px 18px 16px;
-      background: var(--nav-sheet-bg);
-      border-bottom: 1px solid var(--border);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      transform: translateY(-12px);
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
-    }
-
-    .hd__nav a {
-      padding: 12px 10px;
-      font-size: 16px;
-      border-radius: 8px;
-    }
-
-    .hd__nav a::after {
-      display: none;
-    }
-
-    .hd__nav a.is-active {
-      color: var(--accent);
-      background: var(--hover-fill);
-    }
-
-    .hd__right:has(.hd__toggle:checked) .hd__nav {
-      opacity: 1;
-      visibility: visible;
-      transform: none;
     }
   }
 </style>

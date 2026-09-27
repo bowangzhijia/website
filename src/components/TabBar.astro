@@ -1,0 +1,140 @@
+---
+/**
+ * 手机端底部标签栏（桌面端不显示）。
+ *
+ * 五个入口：首页 + 四个栏目。手机上原来的汉堡菜单挪走了，
+ * 目的是让导航像 App 一样一直待在拇指够得到的地方。
+ *
+ * 注意：不能放进 Header.astro——顶栏有 backdrop-filter，
+ * 会给 position:fixed 的子孙元素另建包含块，底栏就会跑位。
+ */
+import { COLUMNS } from '../site.config';
+
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
+
+/** 底栏位置窄，用短名字 */
+const SHORT: Record<string, string> = {
+  redian: '热点',
+  'etf-boduan-wang': 'ETF波段',
+  chahuahui: '茶话会',
+  message: '留言',
+};
+
+/** 每个栏目配一个图标 */
+const ICONS: Record<string, string> = {
+  home: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6.4 9.4V20h11.2V9.4"/>',
+  redian: '<path d="M12 3.7C9.3 7 7.2 9.3 7.2 12.1a4.8 4.8 0 0 0 9.6 0c0-2.8-2.1-5.1-4.8-8.4z"/>',
+  'etf-boduan-wang':
+    '<path d="M3.6 16.6 9 10.7l3.8 3.3L20.4 6.4"/><path d="M15.4 6.4h5v4.9"/>',
+  chahuahui:
+    '<path d="M4.2 7.4A3.2 3.2 0 0 1 7.4 4.2h9.2a3.2 3.2 0 0 1 3.2 3.2v5.4a3.2 3.2 0 0 1-3.2 3.2H9.6l-5.4 4.2z"/>',
+  message: '<rect x="3.2" y="5.6" width="17.6" height="12.8" rx="2.6"/><path d="m4.6 7.4 7.4 5.6 7.4-5.6"/>',
+  dot: '<circle cx="12" cy="12" r="7.5"/>',
+};
+
+const tabs = [
+  { key: 'home', label: '首页', href: '/', active: path === '/' },
+  ...COLUMNS.map((column) => {
+    const base = `/columns/${column.id}`;
+    return {
+      key: ICONS[column.id] ? column.id : 'dot',
+      label: SHORT[column.id] ?? column.name,
+      href: `${base}/`,
+      // 文章页也算在这个栏目下，用前缀判断，别让底栏在文章页全灭
+      active: path === base || path.startsWith(`${base}/`),
+    };
+  }),
+];
+---
+
+<nav class="tabs" aria-label="底部导航">
+  <div class="tabs__inner">
+    {
+      tabs.map((tab) => (
+        <a
+          class:list={['tab', tab.active && 'is-active']}
+          href={tab.href}
+          aria-current={tab.active ? 'page' : undefined}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            set:html={ICONS[tab.key]}
+          />
+          <span>{tab.label}</span>
+        </a>
+      ))
+    }
+  </div>
+</nav>
+
+<style>
+  /* 桌面端整个不渲染 */
+  .tabs {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .tabs {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 45;
+      display: block;
+      background: var(--nav-sheet-bg);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(18px) saturate(150%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      /* 避开 iPhone 底部那条横条 */
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .tabs__inner {
+      display: flex;
+      max-width: 560px;
+      margin-inline: auto;
+    }
+
+    .tab {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: var(--tabbar-h);
+      color: var(--muted);
+      font-size: 10.5px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      transition: color 0.18s ease;
+    }
+
+    .tab:hover {
+      color: var(--text-dim);
+    }
+
+    .tab svg {
+      width: 21px;
+      height: 21px;
+      flex: none;
+    }
+
+    .tab.is-active {
+      color: var(--accent);
+    }
+
+    .tab.is-active svg {
+      stroke-width: 2.1;
+    }
+  }
+</style>

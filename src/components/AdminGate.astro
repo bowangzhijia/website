@@ -1,7 +1,7 @@
 ---
 /**
  * 右下角的设置入口。
- * 访客看到的只是一个齿轮图标，点开要求填生日，填对了才进写作台。
+ * 访客看到的只是一个齿轮图标，点开要求填英文名，填对了才进写作台。
  */
 ---
 
@@ -17,9 +17,17 @@
 
 <div class="gmodal" data-gate-modal hidden>
   <div class="gmodal__mask" data-gate-close></div>
-  <div class="gmodal__box" role="dialog" aria-modal="true" aria-label="请输入生日">
-    <p class="gmodal__title">请填写生日</p>
-    <input class="gmodal__input" type="date" data-gate-input />
+  <div class="gmodal__box" role="dialog" aria-modal="true" aria-label="请输入英文名">
+    <p class="gmodal__title">请输入英文名</p>
+    <input
+      class="gmodal__input"
+      type="text"
+      data-gate-input
+      autocomplete="off"
+      autocapitalize="off"
+      autocorrect="off"
+      spellcheck="false"
+    />
     <p class="gmodal__msg" data-gate-msg></p>
     <div class="gmodal__actions">
       <button class="gbtn" type="button" data-gate-close>取消</button>
@@ -73,7 +81,7 @@
           window.BowangAuth.mark();
           location.href = '/write/';
         } else {
-          msg.textContent = '日期不对';
+          msg.textContent = '不对，再想想';
           msg.dataset.state = 'error';
           input.select();
         }
@@ -98,7 +106,8 @@
   .gate {
     position: fixed;
     right: 14px;
-    bottom: 14px;
+    /* 手机上自动抬到底部标签栏上面；桌面端 --tabbar-h 是 0，等于原来的 14px */
+    bottom: calc(14px + var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
     z-index: 40;
   }
 

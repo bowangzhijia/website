@@ -490,3 +490,26 @@ html.theme-switching *::after {
   transition: background-color 0.28s ease, border-color 0.28s ease,
     color 0.28s ease !important;
 }
+
+/* ==========================================================
+   手机端底部标签栏
+   --tabbar-h 是「要给它让出的高度」，桌面端为 0。
+   右下角齿轮、正文底部留白都靠它定位，改一处就够了。
+   ========================================================== */
+:root {
+  --tabbar-h: 0px;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --tabbar-h: 56px;
+  }
+
+  /*
+   * 给固定的底栏让位。全局是 border-box，
+   * 所以 min-height: 100dvh 不会被 padding 撑高——首页依然一屏不滚动。
+   */
+  body {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  }
+}
