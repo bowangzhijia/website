@@ -16,6 +16,74 @@ const defaultColumn = targets[0]?.id ?? 'redian';
         填完点发布，约 1 分钟后网站更新。内容自动存在这台设备上，关掉页面也不会丢。
       </p>
 
+      <!-- ---------- 使用说明 ---------- -->
+      <details class="help">
+        <summary class="help__summary">使用说明（忘了怎么弄就看这里）</summary>
+
+        <div class="help__body">
+          <h3 class="help__h">怎么进这个页面</h3>
+          <ul class="help__ul">
+            <li><strong>手机</strong>：点桌面上的「写作」图标（没有就往下看「添加到主屏幕」）</li>
+            <li><strong>电脑</strong>：浏览器输入 <code>bowangzhijia.com/write/</code></li>
+          </ul>
+
+          <h3 class="help__h">第一次用：设置令牌</h3>
+          <p class="help__p">
+            这个页面要一把「钥匙」才能发布，这把钥匙叫<strong>令牌</strong>。只需要设置一次。
+          </p>
+          <ol class="help__ol">
+            <li>打开 <code>github.com/settings/personal-access-tokens/new</code></li>
+            <li>
+              按这个填：
+              <div class="help__kv">
+                <div><span>Token name</span><b>write-from-phone</b></div>
+                <div><span>Expiration</span><b>1 year</b></div>
+                <div><span>Repository access</span><b>Only select → bowangzhijia/website</b></div>
+                <div><span>Permissions</span><b>Contents → Read and write</b></div>
+              </div>
+            </li>
+            <li>点下面的 <strong>Generate token</strong>，复制出现的那串 <code>github_pat_…</code></li>
+            <li>回到本页面，点顶部「GitHub 令牌」→ 粘贴 → 点「保存」</li>
+          </ol>
+          <p class="help__warn">
+            ⚠️ 令牌<strong>只显示一次</strong>，建议复制到手机的密码管理器或备忘录里存好。忘了就重新生成一个。
+          </p>
+
+          <h3 class="help__h">日常发布</h3>
+          <ol class="help__ol">
+            <li>填<strong>标题</strong>（日期会自动填今天）</li>
+            <li>点<strong>行业按钮</strong>（可多选，用于网站上的筛选）</li>
+            <li>写<strong>正文</strong></li>
+            <li>点<strong>发布</strong>，等 1 分钟网站就更新了</li>
+          </ol>
+
+          <h3 class="help__h">正文怎么写</h3>
+          <p class="help__p">用这三个符号就够了，也可以用上面的快捷按钮插入：</p>
+          <div class="help__kv">
+            <div><span><code>## </code> 加两个井号</span><b>小标题</b></div>
+            <div><span><code>- </code> 减号加空格</span><b>清单一条</b></div>
+            <div><span><code>**文字**</code></span><b>加粗</b></div>
+          </div>
+          <p class="help__p">换行直接按回车就行。写错了不要紧，改完再发一次会问你是否覆盖。</p>
+
+          <h3 class="help__h">添加到主屏幕</h3>
+          <ul class="help__ul">
+            <li><strong>iPhone</strong>：Safari 打开本页 → 底部「分享」按钮 →「添加到主屏幕」</li>
+            <li><strong>安卓</strong>：Chrome 打开本页 → 右上角「⋮」→「添加到主屏幕」</li>
+          </ul>
+
+          <h3 class="help__h">常见问题</h3>
+          <div class="help__faq">
+            <p><b>提示「请先设置 GitHub 令牌」</b>——令牌没保存成功，或者换了浏览器、清了浏览记录。重新粘贴一次。</p>
+            <p><b>提示「令牌无效或已过期」</b>——去 GitHub 重新生成一个，把旧的删掉。</p>
+            <p><b>提示「令牌权限不足」</b>——生成令牌时 Contents 权限要选 <code>Read and write</code>。</p>
+            <p><b>发布成功但网站没变</b>——等 2 分钟。还没变就去 <code>github.com/bowangzhijia/website/actions</code> 看构建是不是失败了。</p>
+            <p><b>换了手机</b>——重新粘贴一次令牌。存在密码管理器里就能找到，找不到就重新生成一个。</p>
+            <p><b>别人打开这个页面能发布吗</b>——不能。他的令牌代表他自己，对你的仓库没有权限。</p>
+          </div>
+        </div>
+      </details>
+
       <!-- ---------- 令牌 ---------- -->
       <div class="box">
         <button class="box__head" type="button" data-toggle-token aria-expanded="false">
@@ -406,6 +474,125 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     margin: 0 0 22px;
   }
 
+  /* ---------- 使用说明 ---------- */
+  .help {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .help__summary {
+    padding: 12px 15px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .help__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .help__summary::before {
+    content: '▸ ';
+    color: var(--muted);
+  }
+
+  .help[open] .help__summary::before {
+    content: '▾ ';
+  }
+
+  .help__body {
+    padding: 0 15px 16px;
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text-dim);
+  }
+
+  .help__h {
+    margin: 18px 0 7px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .help__h:first-of-type {
+    margin-top: 4px;
+  }
+
+  .help__p {
+    margin: 0 0 9px;
+  }
+
+  .help__ul,
+  .help__ol {
+    margin: 0 0 9px;
+    padding-left: 20px;
+  }
+
+  .help__ul li,
+  .help__ol li {
+    margin-bottom: 5px;
+  }
+
+  .help code {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--code-fill);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent-soft);
+    word-break: break-all;
+  }
+
+  .help__kv {
+    margin: 7px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .help__kv > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 11px;
+    border-radius: 9px;
+    background: var(--chip-fill);
+  }
+
+  .help__kv span {
+    color: var(--muted);
+    flex: none;
+  }
+
+  .help__kv b {
+    color: var(--text);
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .help__warn {
+    margin: 9px 0;
+    padding: 9px 12px;
+    border-radius: 9px;
+    background: var(--accent-tint);
+    color: var(--accent-soft);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+
+  .help__faq p {
+    margin: 0 0 9px;
+  }
+
+  .help__faq b {
+    color: var(--text);
+  }
+
   /* ---------- 令牌折叠区 ---------- */
   .box {
     border: 1px solid var(--border);
@@ -636,6 +823,17 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     }
     .sector span {
       padding: 7px 14px;
+    }
+    /* 窄屏上键值对改成上下排列，避免右侧把字挤断 */
+    .help__kv > div {
+      flex-direction: column;
+      gap: 2px;
+    }
+    .help__kv b {
+      text-align: left;
+    }
+    .help__body {
+      font-size: 13.5px;
     }
   }
 </style>
