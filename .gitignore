@@ -9,3 +9,7 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+
+# 浏览器测试临时产物
+.playwright-cli/
+panel.png
