@@ -39,6 +39,11 @@
     var submitBtn = modal.querySelector('[data-gate-submit]');
 
     function open() {
+      // 这台设备已经验证过，直接进写作台，不再弹窗
+      if (window.BowangAuth && window.BowangAuth.unlocked()) {
+        location.href = '/write/';
+        return;
+      }
       modal.hidden = false;
       msg.textContent = '';
       msg.dataset.state = '';
