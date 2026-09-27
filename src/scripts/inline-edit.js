@@ -14,10 +14,9 @@
   var BRANCH = 'main';
   var DIR = 'src/content/posts';
 
-  var openBtn = document.querySelector('[data-edit-open]');
   var panel = document.querySelector('[data-edit-panel]');
   var dataEl = document.getElementById('article-data');
-  if (!openBtn || !panel || !dataEl) return;
+  if (!panel || !dataEl) return;
 
   var post;
   try {
@@ -25,7 +24,14 @@
   } catch (e) {
     return;
   }
-  if (!post || !post.file) return;
+  if (!post) return;
+
+  /** 新建模式：在栏目页上写一篇属于这个栏目的新文章 */
+  var isNew = post.mode === 'new';
+  if (!isNew && !post.file) return;
+
+  var openBtn = document.querySelector(isNew ? '[data-new-open]' : '[data-edit-open]');
+  if (!openBtn) return;
 
   function token() {
     try {
@@ -33,6 +39,18 @@
     } catch (e) {
       return '';
     }
+  }
+
+  function todayISO() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  /** 新建模式才存草稿：写到一半关掉页面也不会丢 */
+  function draftKey() {
+    return 'bowang-new-draft-' + post.column;
   }
 
   // 没有令牌，就当这个功能不存在
@@ -120,15 +138,39 @@
   }
 
   function fill() {
-    elTitle.value = post.title || '';
-    elSummary.value = post.summary || '';
-    elDate.value = post.date || post.file;
-    elBody.value = post.body || '';
     var current = post.sectors || [];
+
+    if (isNew) {
+      var draft = null;
+      try {
+        draft = JSON.parse(localStorage.getItem(draftKey()) || 'null');
+      } catch (e) {}
+      if (draft) {
+        elTitle.value = draft.title || '';
+        elSummary.value = draft.summary || '';
+        elDate.value = draft.date || todayISO();
+        elBody.value = draft.body || '';
+        current = draft.sectors || [];
+        say('已恢复上次没发出去的草稿');
+      } else {
+        elTitle.value = '';
+        elSummary.value = '';
+        elDate.value = todayISO();
+        elBody.value = '';
+        current = [];
+        say('');
+      }
+    } else {
+      elTitle.value = post.title || '';
+      elSummary.value = post.summary || '';
+      elDate.value = post.date || post.file;
+      elBody.value = post.body || '';
+      say('');
+    }
+
     elsSector.forEach(function (box) {
       box.checked = current.indexOf(box.value) >= 0;
     });
-    say('');
   }
 
   /** 存完之后先把页面上看得见的标题、摘要、日期、行业改掉，不用等网站重新构建 */
@@ -209,14 +251,60 @@
     if (!d.date) return say('请选择日期', 'error');
     if (!d.body) return say('正文不能为空', 'error');
 
-    var oldPath = DIR + '/' + post.file + '.md';
-    var newPath = DIR + '/' + d.date + '.md';
-    var sameFile = newPath === oldPath;
-
     busy(true);
-    say('正在保存…');
+    say('正在提交…');
 
     try {
+      // ---------- 新建模式：文件名就是日期，栏目由页面决定 ----------
+      if (isNew) {
+        var newOnePath = DIR + '/' + d.date + '.md';
+        var freshPayload = {
+          message: '新增：' + d.title,
+          content: base64(buildMarkdown(d)),
+          branch: BRANCH,
+        };
+
+        var putRes = await fetch(api(newOnePath), {
+          method: 'PUT',
+          headers: Object.assign({ 'content-type': 'application/json' }, authHeaders(t)),
+          body: JSON.stringify(freshPayload),
+        });
+
+        // 这一天已经有文章了：GitHub 因为没带 sha 会拒绝，问清楚再覆盖
+        if (putRes.status === 409 || putRes.status === 422) {
+          var goAhead = confirm(
+            d.date + ' 那天已经有文章了。\n\n继续会把原来那篇覆盖掉，确定吗？'
+          );
+          if (!goAhead) {
+            busy(false);
+            return say('已取消', '');
+          }
+          var gotRes = await fetch(fileUrl(newOnePath), { headers: authHeaders(t) });
+          if (!gotRes.ok) throw new Error(await errText(gotRes));
+          freshPayload.sha = (await gotRes.json()).sha;
+          putRes = await fetch(api(newOnePath), {
+            method: 'PUT',
+            headers: Object.assign({ 'content-type': 'application/json' }, authHeaders(t)),
+            body: JSON.stringify(freshPayload),
+          });
+        }
+
+        if (!putRes.ok) throw new Error(await errText(putRes));
+
+        try {
+          localStorage.removeItem(draftKey());
+        } catch (e) {}
+
+        busy(false);
+        say('已发布，约 1 分钟后会出现在栏目页。', 'ok');
+        setTimeout(close, 1500);
+        return;
+      }
+
+      var oldPath = DIR + '/' + post.file + '.md';
+      var newPath = DIR + '/' + d.date + '.md';
+      var sameFile = newPath === oldPath;
+
       // 1) 先拿旧文件的 sha
       var head = await fetch(fileUrl(oldPath), { headers: authHeaders(t) });
       if (head.status === 401) throw new Error('令牌无效或已过期，请回写作台重新设置');
@@ -324,6 +412,21 @@
   }
 
   // ---------- 事件 ----------
+  // 新建模式：边写边存草稿，写到一半把面板关掉也不会丢
+  if (isNew) {
+    var draftTimer = null;
+    var saveDraftSoon = function () {
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(function () {
+        try {
+          localStorage.setItem(draftKey(), JSON.stringify(collect()));
+        } catch (e) {}
+      }, 400);
+    };
+    panel.addEventListener('input', saveDraftSoon);
+    panel.addEventListener('change', saveDraftSoon);
+  }
+
   openBtn.addEventListener('click', open);
   if (cancelBtn) cancelBtn.addEventListener('click', close);
   if (saveBtn) saveBtn.addEventListener('click', save);

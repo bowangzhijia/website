@@ -2,8 +2,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { COLUMNS, SECTORS } from '../site.config';
 
-/** 只有 feed 型栏目接受投稿 */
-const targets = COLUMNS.filter((column) => column.kind === 'feed');
+/** 除了留言栏目（那是表单），其它栏目都可以发文章 */
+const targets = COLUMNS.filter((column) => column.kind !== 'message');
 const defaultColumn = targets[0]?.id ?? 'redian';
 ---
 

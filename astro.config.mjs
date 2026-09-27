@@ -7,6 +7,15 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'always',
   integrations: [sitemap()],
+  /*
+   * 链接预取：页面加载后，把视口里出现的站内链接提前下载好。
+   * 点栏目的时候页面已经在本地了，不用再等网络往返——
+   * 这是「点一下要等两秒」最有效的解法。
+   */
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'viewport',
+  },
   markdown: {
     shikiConfig: { theme: 'github-dark' },
   },

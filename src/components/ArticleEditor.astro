@@ -1,6 +1,8 @@
 ---
 /**
- * 文章就地编辑面板。
+ * 文章编辑面板，两种用法：
+ *   mode="edit"（默认）—— 文章页上改这一篇
+ *   mode="new"        —— 栏目页上写一篇新的，栏目已经定好，不用选
  *
  * 平时是隐藏的，本机存着 GitHub 令牌时脚本才会把入口亮出来。
  * 访客拿到的页面里这块是 hidden 的，而且就算手动打开也提交不了——
@@ -10,22 +12,38 @@ import { SECTORS } from '../site.config';
 import editScript from '../scripts/inline-edit.js?raw';
 
 interface Props {
-  /** 文章所属栏目 id */
+  mode?: 'edit' | 'new';
+  /** 栏目 id */
   column: string;
-  /** 文件名（不含 .md），就是日期，例如 2026-09-27 */
-  file: string;
-  title: string;
+  /** 栏目显示名，按钮上给个提示 */
+  columnName?: string;
+  /** 文件名（不含 .md），就是日期。mode="new" 时不用传 */
+  file?: string;
+  title?: string;
   summary?: string;
-  /** ISO 日期，例如 2026-09-27 */
-  date: string;
-  sectors: string[];
+  /** ISO 日期，例如 2026-09-27。mode="new" 时留空，由脚本填「今天」 */
+  date?: string;
+  sectors?: string[];
   /** Markdown 正文原文 */
-  body: string;
+  body?: string;
 }
 
-const { column, file, title, summary = '', date, sectors, body } = Astro.props;
+const {
+  mode = 'edit',
+  column,
+  columnName = '',
+  file = '',
+  title = '',
+  summary = '',
+  date = '',
+  sectors = [],
+  body = '',
+} = Astro.props;
+
+const isNew = mode === 'new';
 
 const payload = {
+  mode,
   column,
   file,
   title,
@@ -40,14 +58,31 @@ const payload = {
 const json = JSON.stringify(payload).replace(/</g, '\\u003c');
 ---
 
+{
+  isNew && (
+    <button class="aedit__open" type="button" data-new-open hidden>
+      ＋ 写新文章<span class="aedit__open-hint">{columnName}</span>
+    </button>
+  )
+}
+
 <div class="aedit" data-edit-panel hidden>
   <div class="aedit__bar">
     <button class="aedit__cancel" type="button" data-edit-cancel>取消</button>
-    <span class="aedit__label">编辑这篇文章</span>
+    <span class="aedit__label">{isNew ? '写新文章' : '编辑这篇文章'}</span>
     <span class="aedit__pad" aria-hidden="true"></span>
   </div>
 
   <div class="aedit__scroll">
+    {
+      isNew && (
+        <div class="afield">
+          <span class="afield__name">栏目</span>
+          <p class="aedit__fixed">{columnName}</p>
+        </div>
+      )
+    }
+
     <label class="afield">
       <span class="afield__name">标题</span>
       <input type="text" data-edit-title autocomplete="off" />
@@ -86,8 +121,12 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   <div class="aedit__foot">
     <p class="aedit__msg" data-edit-msg role="status" aria-live="polite"></p>
     <div class="aedit__acts">
-      <button class="abtn abtn--primary" type="button" data-edit-save>保存并发布</button>
-      <button class="abtn abtn--danger" type="button" data-edit-delete>删除</button>
+      <button class="abtn abtn--primary" type="button" data-edit-save>
+        {isNew ? '发布' : '保存并发布'}
+      </button>
+      <button class="abtn abtn--danger" type="button" data-edit-delete hidden={isNew}>
+        删除
+      </button>
     </div>
   </div>
 </div>
@@ -96,6 +135,41 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
 <script is:inline set:html={editScript}></script>
 
 <style>
+  /* ---------- 栏目页上的「写新文章」入口 ---------- */
+  .aedit__open {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    /* 隐藏时 display:none，外边距不占位，访客看不到任何空隙 */
+    margin-bottom: 18px;
+    border-radius: 999px;
+    border: 1px dashed var(--accent-border);
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+
+  /* inline-flex 会盖掉 [hidden] 的 display:none，这里补回来 */
+  .aedit__open[hidden] {
+    display: none;
+  }
+
+  .aedit__open:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-style: solid;
+  }
+
+  .aedit__open-hint {
+    font-weight: 400;
+    opacity: 0.75;
+  }
+
   /* ---------- 全屏编辑面板 ---------- */
   .aedit {
     position: fixed;
@@ -217,6 +291,16 @@ const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   .aedit textarea:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* 新建模式下的固定栏目，只是告知，不可改 */
+  .aedit__fixed {
+    margin: 0;
+    padding: 11px 14px;
+    border-radius: 11px;
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-size: 15px;
   }
 
   /* ---------- 行业 ---------- */

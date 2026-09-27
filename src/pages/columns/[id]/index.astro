@@ -5,6 +5,7 @@ import SubscribeForm from '../../../components/SubscribeForm.astro';
 import MessageForm from '../../../components/MessageForm.astro';
 import ContactCard from '../../../components/ContactCard.astro';
 import ColumnFeed from '../../../components/ColumnFeed.astro';
+import ArticleEditor from '../../../components/ArticleEditor.astro';
 import { COLUMNS, PLATFORMS, WELCOME, RISK_NOTE } from '../../../site.config';
 import { getPostsByColumn } from '../../../utils/posts';
 
@@ -19,12 +20,14 @@ const { column, index } = Astro.props;
 
 const isMessage = column.kind === 'message';
 const isFeed = column.kind === 'feed';
+/** 留言栏目是表单，不收文章；其余栏目都能直接在这个页面发 */
+const canPost = !isMessage;
 const intro = column.welcome ?? WELCOME;
 const accounts =
   isMessage || isFeed ? [] : PLATFORMS.filter((p) => p.column === column.id);
 
-/** feed 型栏目（波王热点）要渲染文章列表 */
-const posts = isFeed ? await getPostsByColumn(column.id) : [];
+/** feed 型栏目本身就是文章列表；其它栏目一旦有了文章也会列出来 */
+const posts = canPost ? await getPostsByColumn(column.id) : [];
 ---
 
 <BaseLayout title={column.name} description={column.desc}>
@@ -37,6 +40,9 @@ const posts = isFeed ? await getPostsByColumn(column.id) : [];
             <p class="feedpage__tagline">{column.tagline}</p>
             <p class="feedpage__intro">{intro.body}</p>
           </header>
+
+          {/* 只有本机有令牌才显示，访客看不到 */}
+          <ArticleEditor mode="new" column={column.id} columnName={column.name} />
 
           <ColumnFeed posts={posts} columnId={column.id} />
 
@@ -61,6 +67,8 @@ const posts = isFeed ? await getPostsByColumn(column.id) : [];
             <p class="welcome__body">{intro.body}</p>
           </div>
 
+          {canPost && <ArticleEditor mode="new" column={column.id} columnName={column.name} />}
+
           <div id="subscribe">
             {isMessage ? <MessageForm /> : <SubscribeForm />}
           </div>
@@ -77,6 +85,15 @@ const posts = isFeed ? await getPostsByColumn(column.id) : [];
           )
         }
       </div>
+
+      {
+        posts.length > 0 && (
+          <section class="latest">
+            <h2 class="latest__title">这个栏目的文章</h2>
+            <ColumnFeed posts={posts} columnId={column.id} />
+          </section>
+        )
+      }
 
       <p class="risk">{RISK_NOTE}</p>
     </div>
@@ -131,6 +148,17 @@ const posts = isFeed ? await getPostsByColumn(column.id) : [];
     font-weight: 600;
     font-size: 14.5px;
     margin: 0 0 20px;
+  }
+
+  /* ---------- 平台栏目下的文章列表 ---------- */
+  .latest {
+    margin-top: 38px;
+  }
+
+  .latest__title {
+    font-size: 17px;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
   }
 
   .welcome {
