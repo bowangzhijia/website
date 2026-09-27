@@ -765,24 +765,20 @@ const defaultColumn = targets[0]?.id ?? 'redian';
     margin-bottom: 14px;
   }
 
-  /* 与文章页、编辑面板统一：有边框、有底色、40px 触摸区 */
+  /* 与文章页、编辑面板统一：纯文字 + 箭头，不描边不填底色 */
   .write__back {
     display: inline-flex;
     align-items: center;
     gap: 2px;
     height: 40px;
-    padding: 0 14px 0 9px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--chip-fill);
-    color: var(--text);
+    margin-left: -6px;
+    color: var(--text-dim);
     font-size: 14px;
     font-weight: 600;
   }
 
   .write__back:hover {
     color: var(--accent);
-    border-color: var(--accent-border);
   }
 
   .write__out {

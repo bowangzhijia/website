@@ -121,6 +121,7 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
 
   <ArticleEditor
     column={post.data.column}
+    columnName={column?.name ?? ''}
     file={post.id}
     title={post.data.title}
     summary={post.data.summary ?? ''}
@@ -149,9 +150,9 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
   }
 
   /*
-   * 和编辑面板里的「← 返回」保持同一种样式：
-   * 有边框、有底色、40px 高的触摸区。纯文字灰链接太不显眼，
-   * 手机上尤其容易找不到。
+   * 返回：纯文字 + 箭头，不描边不填底色。
+   * 写作台和编辑面板用的是同一套写法，三处保持一致。
+   * 40px 高只做触摸区，不画出来。
    */
   .art__back {
     display: inline-flex;
@@ -159,18 +160,14 @@ const older = at >= 0 && at < siblings.length - 1 ? siblings[at + 1] : null;
     gap: 2px;
     min-width: 0;
     height: 40px;
-    padding: 0 14px 0 9px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--chip-fill);
-    color: var(--text);
+    margin-left: -6px;
+    color: var(--text-dim);
     font-size: 14px;
     font-weight: 600;
   }
 
   .art__back:hover {
     color: var(--accent);
-    border-color: var(--accent-border);
   }
 
   /* 栏目名太长（比如「ETF基金波段王」）时省略，别把「编辑这篇」挤出去 */
