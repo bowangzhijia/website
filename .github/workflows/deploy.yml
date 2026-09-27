@@ -1,0 +1,46 @@
+# 推送代码到 main 分支时，自动构建并部署到 Cloudflare Pages
+#
+# 需要在仓库的 Settings → Secrets and variables → Actions 里配置两个密钥：
+#   CLOUDFLARE_API_TOKEN   Cloudflare API 令牌（权限：Account / Cloudflare Pages / Edit）
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare 账号 ID
+#
+# 也支持在 Actions 页面手动触发（workflow_dispatch）。
+
+name: 构建并部署
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一时间只跑一个部署，避免并发覆盖
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建网站
+        run: npm run build
+
+      - name: 部署到 Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name bowangzhijia
