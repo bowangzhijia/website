@@ -142,7 +142,13 @@ export type Platform = {
   /** 所属栏目 id */
   column: string;
   url: string;
+  /** 徽章底色（渐变的两端） */
   color: [string, string];
+  /**
+   * 徽章上的文字颜色。
+   * 不填就是白色——白底徽章必须填这个，否则白字白底看不见。
+   */
+  fg?: string;
 };
 
 export const PLATFORMS: Platform[] = [
@@ -163,6 +169,24 @@ export const PLATFORMS: Platform[] = [
     column: 'etf-boduan-wang',
     url: 'https://v.douyin.com/fDGEoMOjYrM/',
     color: ['#000000', '#3A3A44'],
+  },
+  {
+    name: '雪球',
+    badge: '雪球',
+    handle: '@ETF基金波段王',
+    column: 'etf-boduan-wang',
+    url: 'https://xueqiu.com/u/1311183441',
+    // 白色底纹：徽章用浅灰渐变打底，配雪球蓝的字，不然白底白字看不见
+    color: ['#FFFFFF', '#E8EDF5'],
+    fg: '#0B69C7',
+  },
+  {
+    name: '知乎',
+    badge: '知乎',
+    handle: '@ETF基金波段王',
+    column: 'etf-boduan-wang',
+    url: 'https://www.zhihu.com/people/jason-shao-43',
+    color: ['#0084FF', '#4FB0FF'],
   },
 
   // ---------- 波王茶话会 ----------
