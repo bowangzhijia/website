@@ -1,0 +1,80 @@
+---
+/**
+ * 「立即抓热点」按钮。
+ *
+ * 放在「波王热点」栏目页，跟「＋ 写新文章」并排。
+ * 点一下就触发 GitHub 上的「每日热点速览」工作流，不用去 GitHub 页面。
+ *
+ * 平时整块是隐藏的，只有本机存着 GitHub 令牌时脚本才会把它亮出来——
+ * 访客看到的页面和以前一模一样。
+ */
+import triggerScript from '../scripts/hot-news-trigger.js?raw';
+---
+
+<button
+  class="hotnews"
+  type="button"
+  data-hotnews
+  hidden
+  title="立刻跑一次「每日热点速览」。如果今天已经有文章，这次会跳过（不会覆盖你改过的内容）"
+>
+  ⟳ 立即抓热点
+</button>
+<p class="hotnews__msg" data-hotnews-msg role="status" aria-live="polite"></p>
+
+<script is:inline set:html={triggerScript}></script>
+
+<style>
+  .hotnews {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    margin-bottom: 18px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.16s ease, border-color 0.16s ease;
+  }
+
+  /* inline-flex 会盖掉 [hidden] 的 display:none，这里补回来 */
+  .hotnews[hidden] {
+    display: none;
+  }
+
+  .hotnews:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+  }
+
+  .hotnews:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  /* 有内容时才占位置，空着不占高度 */
+  .hotnews__msg {
+    flex: 1 0 100%;
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .hotnews__msg[data-state='ok'] {
+    color: var(--down);
+  }
+
+  .hotnews__msg[data-state='error'] {
+    color: var(--up);
+  }
+
+  .hotnews__msg[data-state='busy'] {
+    color: var(--text-dim);
+  }
+</style>

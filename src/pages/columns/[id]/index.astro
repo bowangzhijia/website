@@ -6,6 +6,7 @@ import MessageForm from '../../../components/MessageForm.astro';
 import ContactCard from '../../../components/ContactCard.astro';
 import ColumnFeed from '../../../components/ColumnFeed.astro';
 import ArticleEditor from '../../../components/ArticleEditor.astro';
+import HotNewsTrigger from '../../../components/HotNewsTrigger.astro';
 import { COLUMNS, PLATFORMS, WELCOME, RISK_NOTE } from '../../../site.config';
 import { getPostsByColumn } from '../../../utils/posts';
 
@@ -20,6 +21,12 @@ const { column, index } = Astro.props;
 
 const isMessage = column.kind === 'message';
 const isFeed = column.kind === 'feed';
+
+/**
+ * 「立即抓热点」只放在波王热点。
+ * 自动生成的热点速览就是发到这个栏目的（见 scripts/hot-news.mjs 的 COLUMN）。
+ */
+const isHotNewsColumn = column.id === 'redian';
 /** 留言栏目是表单，不收文章；其余栏目都能直接在这个页面发 */
 const canPost = !isMessage;
 const intro = column.welcome ?? WELCOME;
@@ -42,9 +49,12 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
           </header>
 
           {/* 只有本机有令牌才显示，访客连按钮都看不到 */}
-          <button class="aedit-open" type="button" data-new-open hidden>
-            ＋ 写新文章<span class="aedit-open__hint">{column.name}</span>
-          </button>
+          <div class="colbar">
+            <button class="aedit-open" type="button" data-new-open hidden>
+              ＋ 写新文章<span class="aedit-open__hint">{column.name}</span>
+            </button>
+            {isHotNewsColumn && <HotNewsTrigger />}
+          </div>
 
           <ColumnFeed posts={posts} columnId={column.id} />
 
@@ -159,6 +169,17 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
     font-weight: 600;
     font-size: 14.5px;
     margin: 0 0 20px;
+  }
+
+  /*
+   * 栏目页顶部那排管理按钮：写新文章 / 立即抓热点。
+   * 不加 margin —— 两个按钮都隐藏时这一排高度为 0，访客看不到任何空隙。
+   */
+  .colbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   /* ---------- 平台栏目下的文章列表 ---------- */
