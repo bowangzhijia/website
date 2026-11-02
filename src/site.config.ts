@@ -71,14 +71,22 @@ export const COLUMNS: Column[] = [
     color: ['#e0533d', '#ff8a70'],
     kind: 'feed',
   },
-  {
-    id: 'daren',
-    name: '大佬发言',
-    tagline: '马斯克 / 特朗普 / 奥特曼的 X 原话',
-    desc: '自动抓取马斯克、特朗普、奥特曼在 X 上的公开发言，中英对照，只翻原话不加评论。',
-    color: ['#1d9bf0', '#6ec6ff'],
-    kind: 'feed',
-  },
+  // ─── 大佬发言（暂时停用，2026-11-02）────────────────────────────
+  // 栏目、抓取脚本 scripts/x-quotes.mjs、自动任务 .github/workflows/x-quotes.yml
+  // 都已经写好了，只卡在「取数」这一步：X 的免费接口只对住宅 IP 放行，
+  // 机房 IP（GitHub Actions、云服务器、公共代理）第一个请求就 429，
+  // 撑不起每天自动更新。实测记录见 x-quotes.mjs 顶部的注释。
+  //
+  // 什么时候重启：换成付费接口（twitterapi.io 之类，一个月几块钱），
+  // 改 fetchTimeline() 一个函数，再把下面这段注释放开即可。
+  // {
+  //   id: 'daren',
+  //   name: '大佬发言',
+  //   tagline: '马斯克 / 特朗普 / 奥特曼的 X 原话',
+  //   desc: '自动抓取马斯克、特朗普、奥特曼在 X 上的公开发言，中英对照，只翻原话不加评论。',
+  //   color: ['#1d9bf0', '#6ec6ff'],
+  //   kind: 'feed',
+  // },
   {
     id: 'etf-boduan-wang',
     name: 'ETF基金波段王',
