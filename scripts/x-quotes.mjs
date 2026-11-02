@@ -27,7 +27,7 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const POSTS_DIR = join(ROOT, 'src', 'content', 'posts');
@@ -424,7 +424,29 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('✖  出错：', err);
-  process.exitCode = 1;
-});
+/**
+ * 只有「直接运行」时才跑主流程。
+ * 被别的脚本 import 时（比如自检）只提供函数，不产生副作用。
+ */
+const isDirectRun =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error('✖  出错：', err);
+    process.exitCode = 1;
+  });
+}
+
+/** 给自检用 */
+export {
+  extractTweets,
+  select,
+  normalizeText,
+  pickSector,
+  buildMarkdown,
+  beijingStamp,
+  escapeMd,
+  unescapeHtml,
+  PEOPLE,
+};
