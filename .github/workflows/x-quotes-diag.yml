@@ -24,16 +24,16 @@ jobs:
       - name: 看看这台机器能不能连上 X
         continue-on-error: true
         run: |
-          echo "=== 当前出口 IP ===" > x-quotes-diag.log
-          curl -s https://api.ipify.org >> x-quotes-diag.log 2>&1 || echo "取 IP 失败" >> x-quotes-diag.log
-          echo "" >> x-quotes-diag.log
-          echo "=== 直接打一次 syndication 接口 ===" >> x-quotes-diag.log
+          echo "=== 当前出口 IP ===" > x-quotes-diag.txt
+          curl -s https://api.ipify.org >> x-quotes-diag.txt 2>&1 || echo "取 IP 失败" >> x-quotes-diag.txt
+          echo "" >> x-quotes-diag.txt
+          echo "=== 直接打一次 syndication 接口 ===" >> x-quotes-diag.txt
           curl -s -o /dev/null -w "status=%{http_code}\n" \
             -H "user-agent: Mozilla/5.0" \
-            https://syndication.twitter.com/srv/timeline-profile/screen-name/elonmusk >> x-quotes-diag.log 2>&1 || echo "curl 失败" >> x-quotes-diag.log
-          echo "" >> x-quotes-diag.log
-          echo "=== 跑脚本 ===" >> x-quotes-diag.log
-          node scripts/x-quotes.mjs >> x-quotes-diag.log 2>&1 || echo "(脚本退出码非 0)" >> x-quotes-diag.log
+            https://syndication.twitter.com/srv/timeline-profile/screen-name/elonmusk >> x-quotes-diag.txt 2>&1 || echo "curl 失败" >> x-quotes-diag.txt
+          echo "" >> x-quotes-diag.txt
+          echo "=== 跑脚本 ===" >> x-quotes-diag.txt
+          node scripts/x-quotes.mjs >> x-quotes-diag.txt 2>&1 || echo "(脚本退出码非 0)" >> x-quotes-diag.txt
 
       - name: 提交日志
         run: |
