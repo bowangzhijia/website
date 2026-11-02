@@ -72,6 +72,14 @@ export const COLUMNS: Column[] = [
     kind: 'feed',
   },
   {
+    id: 'daren',
+    name: '大佬发言',
+    tagline: '马斯克 / 特朗普 / 奥特曼的 X 原话',
+    desc: '自动抓取马斯克、特朗普、奥特曼在 X 上的公开发言，中英对照，只翻原话不加评论。',
+    color: ['#1d9bf0', '#6ec6ff'],
+    kind: 'feed',
+  },
+  {
     id: 'etf-boduan-wang',
     name: 'ETF基金波段王',
     tagline: 'ETF 波段交易',

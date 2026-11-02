@@ -15,6 +15,7 @@ const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
 /** 底栏位置窄，用短名字 */
 const SHORT: Record<string, string> = {
   redian: '热点',
+  daren: '大佬',
   'etf-boduan-wang': 'ETF波段',
   chahuahui: '茶话会',
   message: '留言',
@@ -24,6 +25,8 @@ const SHORT: Record<string, string> = {
 const ICONS: Record<string, string> = {
   home: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6.4 9.4V20h11.2V9.4"/>',
   redian: '<path d="M12 3.7C9.3 7 7.2 9.3 7.2 12.1a4.8 4.8 0 0 0 9.6 0c0-2.8-2.1-5.1-4.8-8.4z"/>',
+  daren:
+    '<path d="M5 10.6v2.8a1.4 1.4 0 0 0 1.4 1.4H8l5.4 3.8V5.4L8 9.2H6.4A1.4 1.4 0 0 0 5 10.6z"/><path d="M16.6 9.4a3.7 3.7 0 0 1 0 5.2"/>',
   'etf-boduan-wang':
     '<path d="M3.6 16.6 9 10.7l3.8 3.3L20.4 6.4"/><path d="M15.4 6.4h5v4.9"/>',
   chahuahui:
