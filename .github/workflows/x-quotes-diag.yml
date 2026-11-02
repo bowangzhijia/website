@@ -1,0 +1,49 @@
+# 临时诊断：把脚本输出提交到仓库里，好在本地读到失败原因。
+# 查完就删。
+name: 大佬发言诊断
+
+on:
+  push:
+    paths:
+      - '.github/workflows/x-quotes-diag.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 看看这台机器能不能连上 X
+        continue-on-error: true
+        run: |
+          echo "=== 当前出口 IP ===" > x-quotes-diag.log
+          curl -s https://api.ipify.org >> x-quotes-diag.log 2>&1 || echo "取 IP 失败" >> x-quotes-diag.log
+          echo "" >> x-quotes-diag.log
+          echo "=== 直接打一次 syndication 接口 ===" >> x-quotes-diag.log
+          curl -s -o /dev/null -w "status=%{http_code}\n" \
+            -H "user-agent: Mozilla/5.0" \
+            https://syndication.twitter.com/srv/timeline-profile/screen-name/elonmusk >> x-quotes-diag.log 2>&1 || echo "curl 失败" >> x-quotes-diag.log
+          echo "" >> x-quotes-diag.log
+          echo "=== 跑脚本 ===" >> x-quotes-diag.log
+          node scripts/x-quotes.mjs >> x-quotes-diag.log 2>&1 || echo "(脚本退出码非 0)" >> x-quotes-diag.log
+
+      - name: 提交日志
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "没有变化"
+            exit 0
+          fi
+          git commit -m "诊断日志：大佬发言"
+          git pull --rebase --autostash origin main
+          git push origin main
