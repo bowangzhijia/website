@@ -58,11 +58,12 @@ jobs:
           } >> etf-probe.txt
 
       - name: C 深交所 —— 列表（上午在 Actions 里超时）
+        continue-on-error: true
         run: |
           {
             echo ""
             echo "=== C 深交所 列表 CATALOGID=1945（预热后）==="
-            curl -s -c szse.txt -o /dev/null --max-time 25 -H "User-Agent: $UA" 'https://www.szse.cn/market/product/list/etfList/index.html'
+            curl -s -c szse.txt -o /dev/null --max-time 20 -H "User-Agent: $UA" 'https://www.szse.cn/market/product/list/etfList/index.html' || echo "[预热超时，继续]"
             curl -s -b szse.txt --max-time 25 -H "User-Agent: $UA" \
               -H 'Referer: https://www.szse.cn/market/product/list/etfList/index.html' \
               -w '\n[status=%{http_code}]\n' \
@@ -70,13 +71,15 @@ jobs:
           } >> etf-probe.txt
 
       - name: D 深交所 —— 历史逐日份额 fund_jjgm
+        continue-on-error: true
         run: |
           {
             echo ""
             echo "=== D 深交所 历史份额 fund_jjgm（159915，2026-11-10 ~ 2026-11-20）==="
             curl -s --max-time 30 -H "User-Agent: $UA" -H 'Referer: https://fund.szse.cn/' \
               -w '\n[status=%{http_code}]\n' \
-              'https://fund.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=fund_jjgm&TABKEY=tab1&txtDm=159915&txtStart=2026-11-10&txtEnd=2026-11-20&PAGENO=1' | head -c 1500
+              'https://fund.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=fund_jjgm&TABKEY=tab1&txtDm=159915&txtStart=2026-11-10&txtEnd=2026-11-20&PAGENO=1' \
+              | head -c 1500 || echo "[失败]"
           } >> etf-probe.txt
 
       - name: 提交结果
