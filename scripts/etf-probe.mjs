@@ -1,9 +1,9 @@
-// 一次性验证：GitHub Actions 的海外 IP 能不能拿到交易所 ETF 份额。
+// 一次性验证第二轮的：交易所 WAF 会不会因为连发请求直接掐连接。
 //
-// 本地（住宅 IP）已验证数据源正确，这里只回答一个问题：
-// Actions 能不能访问？不能的话整个方案要重来。
+// 第一轮结果：上交所第一条 200（927 条），紧接着第二条 fetch failed，
+// 深交所也 failed。判断是限速/连接重置，不是不可达。
+// 这轮加请求间隔 + 重试，并把底层错误打出来。
 //
-// 结果写进 etf-probe.txt，由 workflow 提交回仓库。
 // 结论确认后本文件和 etf-probe.yml 一起删掉。
 
 import { writeFileSync } from 'node:fs';
@@ -16,61 +16,64 @@ const SZSE_H = { 'User-Agent': UA, Referer: 'https://www.szse.cn/', Origin: 'htt
 
 const out = [];
 const log = (s = '') => out.push(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-log('=== Actions 能否访问交易所 ETF 份额接口 ===');
+async function getJson(label, url, headers, tries = 3) {
+  for (let i = 1; i <= tries; i++) {
+    try {
+      const r = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+      const text = await r.text();
+      let j = null;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        log(`${label} 第${i}次: status=${r.status} 非 JSON，前 200 字符: ${text.slice(0, 200)}`);
+        return null;
+      }
+      log(`${label} 第${i}次: status=${r.status} OK`);
+      return j;
+    } catch (e) {
+      const cause = e?.cause?.code || e?.cause?.message || e?.name || '?';
+      log(`${label} 第${i}次失败: ${e?.message} / cause=${cause}`);
+      if (i < tries) await sleep(1500 * i);
+    }
+  }
+  return null;
+}
+
+log('=== 第二轮：间隔 + 重试 ===');
 log(`北京时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
 log(`出口 IP: ${process.env.PROBE_IP || '(未取)'}`);
 log('');
 
-// ---------- 上交所 ----------
 const sseUrl = (d) =>
   'https://query.sse.com.cn/commonQuery.do?sqlId=COMMON_SSE_ZQPZ_ETFZL_XXPL_ETFGM_SEARCH_L' +
   `&STAT_DATE=${d}&pageHelp.pageSize=10000&pageHelp.pageNo=1&pageHelp.beginPage=1&pageHelp.cacheSize=1&pageHelp.endPage=1`;
 
-for (const d of ['2026-11-20', '2026-11-19', '2026-11-14']) {
-  log(`--- 上交所 STAT_DATE=${d}`);
-  try {
-    const r = await fetch(sseUrl(d), { headers: SSE_H, signal: AbortSignal.timeout(25000) });
-    const j = await r.json();
-    const rows = j.result || [];
-    log(`status=${r.status} 条数=${rows.length}`);
-    if (rows.length) {
-      log(`样例: ${JSON.stringify(rows[0])}`);
-      const types = {};
-      for (const x of rows) types[x.ETF_TYPE] = (types[x.ETF_TYPE] || 0) + 1;
-      log(`ETF_TYPE 分布: ${JSON.stringify(types)}`);
-      const noShare = rows.filter((x) => !x.TOT_VOL || Number(x.TOT_VOL) <= 0).length;
-      log(`TOT_VOL 为空/0 的条数: ${noShare}`);
-      // 挑一只大 ETF 看看数对不对（510300 华泰柏瑞沪深300）
-      const big = rows.find((x) => x.SEC_CODE === '510300');
-      log(`510300: ${big ? JSON.stringify(big) : '不在列表里'}`);
-    }
-  } catch (e) {
-    log(`失败: ${e?.name} ${e?.message}`);
-  }
+// 连取 3 个交易日，验证「历史可回溯」在 Actions 里也成立
+for (const d of ['2026-11-20', '2026-11-19', '2026-11-18']) {
+  log(`--- 上交所 ${d}`);
+  const j = await getJson('SSE', sseUrl(d), SSE_H);
+  const rows = j?.result || [];
+  log(`  条数=${rows.length}`);
+  const big = rows.find((x) => x.SEC_CODE === '510300');
+  if (big) log(`  510300 份额=${big.TOT_VOL} 万份`);
+  await sleep(3000);
   log('');
 }
 
-// ---------- 深交所 ----------
-log('--- 深交所 CATALOGID=1945（ETF列表，只能取最新一期）');
-try {
-  const u =
-    'https://www.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=1945' +
-    '&TABKEY=tab1&PAGENO=1&random=0.3';
-  const r = await fetch(u, { headers: SZSE_H, signal: AbortSignal.timeout(25000) });
-  const j = await r.json();
+log('--- 深交所 CATALOGID=1945');
+const szseUrl =
+  'https://www.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=1945&TABKEY=tab1&PAGENO=1&random=0.3';
+const j = await getJson('SZSE', szseUrl, SZSE_H);
+if (j?.[0]) {
   const t = j[0];
-  log(`status=${r.status}`);
-  log(`报表: ${t.metadata.name} / 日期: ${t.metadata.subname} / 总数: ${t.metadata.recordcount} / 页数: ${t.metadata.pagecount}`);
-  log(`列: ${JSON.stringify(t.metadata.cols)}`);
-  log(`首行: ${JSON.stringify(t.data[0])}`);
-} catch (e) {
-  log(`失败: ${e?.name} ${e?.message}`);
+  log(`  报表=${t.metadata.name} 日期=${t.metadata.subname} 总数=${t.metadata.recordcount} 页数=${t.metadata.pagecount}`);
+  log(`  首行=${JSON.stringify(t.data[0])}`);
 }
 
 log('');
 log('=== 结束 ===');
-log('判读：上交所 11-20 / 11-19 有几百条、11-14 为 0 条，深交所有 700+ 条，就算通了。');
 
 writeFileSync('etf-probe.txt', out.join('\n') + '\n', 'utf8');
 console.log(out.join('\n'));
