@@ -34,7 +34,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 出口 IP
-        run: echo "出口 IP: $(curl -s --max-time 10 https://api.ipify.org)" > etf-probe.txt
+        run: |
+          echo "出口 IP: $(curl -s --max-time 10 https://api.ipify.org)" > etf-probe.txt
 
       - name: A 上交所 —— 不带 cookie（对照）
         run: |
