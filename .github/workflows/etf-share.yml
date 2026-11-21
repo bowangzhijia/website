@@ -1,0 +1,78 @@
+# 每交易日生成「ETF 份额异动」，抓不到就等下一个时段重试。
+#
+# 为什么要排三个时段：交易所接口对境外 IP 是抽签——同一个脚本，
+# 有的出口 IP 全通，有的上交所 403、深交所超时。单靠一次跑，失败率不低。
+# 脚本会检查当天的文章是否已生成，有就跳过，所以多排几次不浪费请求。
+#
+# 抓取、提交、构建、部署必须放在同一个 job：
+# 用 GITHUB_TOKEN 推上去的提交不会再触发别的 workflow（GitHub 防止无限递归），
+# 只提交不构建，内容就上不了线。
+
+name: ETF 份额异动
+
+on:
+  schedule:
+    # 北京时间 09:10 / 09:40 / 10:10，周一到周五。
+    # 深交所官方说明：T 日晚间的 T 日规模仅供参考，以 T+1 日早间为准，
+    # 所以必须等到次日上午 9 点后才有准数据。
+    - cron: '10 1 * * 1-5'
+    - cron: '40 1 * * 1-5'
+    - cron: '10 2 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: etf-share
+  cancel-in-progress: false
+
+jobs:
+  etf-share:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 抓份额并生成文章
+        run: node scripts/etf-share.mjs
+
+      - name: 提交
+        id: commit
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "没有新内容（文章已存在或接口全挂），结束"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "ETF份额：$(TZ=Asia/Shanghai date +%Y-%m-%d)"
+          git pull --rebase --autostash origin main
+          git push origin main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: 安装依赖
+        if: steps.commit.outputs.changed == 'true'
+        run: npm ci
+
+      - name: 构建网站
+        if: steps.commit.outputs.changed == 'true'
+        run: npm run build
+
+      - name: 部署到 Cloudflare Pages
+        if: steps.commit.outputs.changed == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name bowangzhijia
