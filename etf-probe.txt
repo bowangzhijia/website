@@ -1,22 +1,22 @@
-=== Actions 能否访问交易所 ETF 份额接口 ===
-北京时间: 2026/11/21 20:47:14
-出口 IP: 172.203.239.88
+=== 第二轮：间隔 + 重试 ===
+北京时间: 2026/11/21 20:48:10
+出口 IP: 52.165.58.39
 
---- 上交所 STAT_DATE=2026-11-20
-status=200 条数=927
-样例: {"STAT_DATE":"2026-11-20","ETF_TYPE":"单市","SEC_CODE":"510010","SEC_NAME":"治理ETF","TOT_VOL":"12752.44"}
-ETF_TYPE 分布: {"单市":213,"跨市":554,"跨境":128,"其他":32}
-TOT_VOL 为空/0 的条数: 0
-510300: {"STAT_DATE":"2026-11-20","ETF_TYPE":"跨市","SEC_CODE":"510300","SEC_NAME":"300ETF","TOT_VOL":"5518488.77"}
+--- 上交所 2026-11-20
+SSE 第1次: status=403 非 JSON，前 200 字符: <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>403</title><style>body{background:#f3f3f4;color:#676a6c;height:100%;font-fami
+  条数=0
 
---- 上交所 STAT_DATE=2026-11-19
-失败: TypeError fetch failed
+--- 上交所 2026-11-19
+SSE 第1次: status=403 非 JSON，前 200 字符: <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>403</title><style>body{background:#f3f3f4;color:#676a6c;height:100%;font-fami
+  条数=0
 
---- 上交所 STAT_DATE=2026-11-14
-status=200 条数=0
+--- 上交所 2026-11-18
+SSE 第1次: status=403 非 JSON，前 200 字符: <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>403</title><style>body{background:#f3f3f4;color:#676a6c;height:100%;font-fami
+  条数=0
 
---- 深交所 CATALOGID=1945（ETF列表，只能取最新一期）
-失败: TypeError fetch failed
+--- 深交所 CATALOGID=1945
+SZSE 第1次失败: fetch failed / cause=ETIMEDOUT
+SZSE 第2次失败: fetch failed / cause=ETIMEDOUT
+SZSE 第3次失败: fetch failed / cause=ETIMEDOUT
 
 === 结束 ===
-判读：上交所 11-20 / 11-19 有几百条、11-14 为 0 条，深交所有 700+ 条，就算通了。
