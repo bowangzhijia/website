@@ -197,8 +197,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                     <th>代码</th>
                     <th>名称</th>
                     <th class="r">规模(亿)</th>
-                    <th class="r">变化(亿份)</th>
                     {hasPrice && <th class="r">净流入(亿元)</th>}
+                    <th class="r">变化(亿份)</th>
                     <th class="r">变化率</th>
                     <th class="r">涨跌幅</th>
                   </tr>
@@ -280,8 +280,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
         tr.innerHTML =
           `<td class="code">${r.c}</td><td>${r.n}</td>` +
           `<td class="r dim">${r.sc != null ? r.sc.toFixed(1) : '—'}</td>` +
-          `<td class="r ${tone(r.d)}">${sign(r.d)}</td>` +
           (hasPrice ? `<td class="r ${tone(r.amt)}">${sign(r.amt)}</td>` : '') +
+          `<td class="r ${tone(r.d)}">${sign(r.d)}</td>` +
           `<td class="r ${tone(r.p)}">${sign(r.p, '%')}</td>` +
           `<td class="r ${tone(r.chg)}">${sign(r.chg, '%')}</td>`;
         body.appendChild(tr);
