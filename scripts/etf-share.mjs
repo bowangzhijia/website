@@ -1032,13 +1032,15 @@ async function buildHistory(deepBars = 0) {
   }
 
   // 合并旧数据：以并集为时间轴，新数据覆盖同一天
-  if (old?.dates?.length && old?.baskets?.length) {
-    const mergedDates = [...new Set([...old.dates, ...dates])].sort();
+  // 注意 old.dates 可能是「上证全历史」，真正的份额日期在 old.flowDates 里
+  const oldFlowDates = old?.flowDates || (old?.dates ? old.dates.slice(old.flowStart || 0) : []);
+  if (oldFlowDates.length && old?.baskets?.length) {
+    const mergedDates = [...new Set([...oldFlowDates, ...dates])].sort();
     const mergedFlows = {};
     for (const b of loadBaskets()) {
       const oldB = old.baskets.find((x) => x.id === b.id);
       const m = new Map();
-      if (oldB) old.dates.forEach((d, i) => m.set(d, oldB.flow[i]));
+      if (oldB) oldFlowDates.forEach((d, i) => m.set(d, oldB.flow[i]));
       dates.forEach((d, i) => m.set(d, (flows[b.id] || [])[i] ?? 0));
       mergedFlows[b.id] = mergedDates.map((d) => m.get(d) ?? 0);
     }
@@ -1046,42 +1048,34 @@ async function buildHistory(deepBars = 0) {
     flows = mergedFlows;
   }
 
-  // 指数 K 线：按最终时间轴对齐，缺的那天留 null
-  const indices = [];
-  for (const idx of INDICES) {
-    const k = await fetchIndexKline(idx.secid, 'all');
-    if (!k.length) {
-      console.warn(`   ${idx.name} K 线没拿到，跳过`);
-      continue;
-    }
-    const km = new Map(k.map((x) => [x.d, x]));
-    indices.push({
-      code: idx.code,
-      name: idx.name,
-      basket: idx.basket,
-      // [开, 收, 高, 低]，和 dates 一一对应
-      k: dates.map((d) => {
-        const x = km.get(d);
-        return x ? [x.o, x.c, x.h, x.l] : null;
-      }),
-    });
-    await sleep(120);
+  // K 线只用上证指数，拉成立以来全部（1990 至今 8000 多根）
+  const sh = await fetchIndexKline('1.000001', 'all');
+  if (!sh.length) {
+    console.warn('   上证指数 K 线没拿到，图表会空');
   }
+  const klineDates = sh.map((x) => x.d);
 
-  // 六大宽基合计。上证综指没有规模够看的 ETF，选它时下面就用这条
+  // 份额数据落在全历史时间轴的哪个位置（前面那段柱子是空的）
+  let flowStart = klineDates.findIndex((d) => d >= dates[0]);
+  if (flowStart < 0) flowStart = 0;
+
+  // 六大宽基合计
   const aggregate = dates.map((_, i) =>
     Math.round(Object.values(flows).reduce((s, f) => s + (f[i] || 0), 0) * 100) / 100
   );
 
   const out = {
     updated: new Date().toISOString(),
-    dates,
+    dates: klineDates,
+    flowDates: dates,
+    flowStart,
+    kline: sh.map((x) => [x.o, x.c, x.h, x.l]),
+    // 篮子 flow 只存有份额的那一段，页面上按 flowStart 铺到全历史
     baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
     aggregate,
-    indices,
   };
   writeFileSync(histPath, JSON.stringify(out), 'utf8');
-  console.log(`   ✔ 已更新 history.json（${dates.length} 个交易日，${indices.length} 个指数）`);
+  console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天）`);
 }
 
 // ============================================================

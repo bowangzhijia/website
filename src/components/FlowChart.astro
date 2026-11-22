@@ -1,35 +1,37 @@
 ---
 /**
- * 指数 K 线 + 宽基资金流柱状图（可缩放、可拖动，像看盘软件那样）。
+ * 上证指数 K 线（全历史）+ 宽基资金流柱状图（可缩放、可拖动）。
  *
- * 用 ECharts 的 dataZoom：底部进度条拖动、滚轮缩放、按住左右平移。
- * 手写 SVG 做不出这个交互，所以这里引了图表库，按需引入控制体积。
+ * K 线固定是上证指数，不跟按钮走——按钮只切换下面的资金流看哪个篮子。
+ * 上证指数从 1990 年至今有 8000 多根 K 线，但 ETF 份额只有最近一年，
+ * 所以柱子在早期是空的，往右拖到近一年才有。
  *
- * 数据来自 src/data/etf-share/history.json，脚本每天生成。
+ * 用 ECharts 的 dataZoom：底部滑块拖动、滚轮缩放、按住平移。
  */
 interface Props {
   data: any;
 }
 
 const { data } = Astro.props;
-const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x.k.length);
+const hasKline = Array.isArray(data?.kline) && data.kline.length > 0;
+const baskets: any[] = data?.baskets ?? [];
 ---
 
 {
-  indices.length > 0 && (
+  hasKline && (
     <section class="fc" data-flowchart>
       <div class="fc__head">
-        <h2 class="fc__h">指数走势 vs 资金流</h2>
+        <h2 class="fc__h">上证指数 vs 宽基资金流</h2>
         <p class="fc__sub">
-          上面 K 线，下面是<strong>资金净流入</strong>（亿元，不是成交额）。
-          底部滑块拖动看历史，滚轮缩放，按住图表可以左右平移。
+          上面是<strong>上证指数</strong> K 线（成立以来全部），下面是所选宽基的<strong>资金净流入</strong>（亿元，不是成交额）。
+          柱子只有最近一年——ETF 份额是近年才有的数据。底部滑块拖动看历史，滚轮缩放。
         </p>
       </div>
 
       <div class="fc__tabs" role="tablist">
-        {indices.map((it: any, i: number) => (
+        {baskets.map((b: any, i: number) => (
           <button class="fc__tab" type="button" data-idx={i} aria-pressed={i === 0 ? 'true' : 'false'}>
-            {it.name}
+            {b.name}
           </button>
         ))}
       </div>
@@ -45,9 +47,10 @@ const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x
 
 <script type="application/json" id="flow-data" is:inline set:html={JSON.stringify({
     dates: data?.dates ?? [],
-    baskets: data?.baskets ?? [],
+    kline: data?.kline ?? [],
+    flowStart: data?.flowStart ?? 0,
+    baskets,
     aggregate: data?.aggregate ?? [],
-    indices,
   })}></script>
 
 <script>
@@ -76,10 +79,12 @@ const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x
 
   if (el && root) {
     const data = JSON.parse(el.textContent || '{}');
-    const dates: string[] = data.dates || [];
+    const dates: string[] = data.dates || []; // 上证指数全历史
+    const kline: any[] = data.kline || []; // [开,收,高,低]，和 dates 对齐
+    const flowStart: number = Number(data.flowStart) || 0;
     const baskets: any[] = data.baskets || [];
     const aggregate: number[] = data.aggregate || [];
-    const indices: any[] = data.indices || [];
+    const n = dates.length;
 
     const canvas = root.querySelector('[data-canvas]') as HTMLElement;
     const legend = root.querySelector('[data-legend]') as HTMLElement;
@@ -88,177 +93,182 @@ const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x
 
     const css = (k: string, fb: string) => getComputedStyle(document.documentElement).getPropertyValue(k).trim() || fb;
 
-    let chart: any = null;
-    let current = 0;
-    let zoom = { start: 40, end: 100 };
-
-    function seriesOf(it: any) {
-      const basket = baskets.find((b) => b.id === it.basket);
-      // 上证综指没有规模够看的 ETF，退化成六大宽基合计
-      const flow: number[] = basket?.flow ?? aggregate;
-      const label = basket ? `${it.name} 篮子` : '六大宽基合计';
-      return { flow, label };
+    /** 把「只有最近一年」的资金流铺到全历史时间轴上 */
+    function expand(short: number[]): number[] {
+      const full = new Array(n).fill(0);
+      for (let i = 0; i < short.length; i++) {
+        const idx = flowStart + i;
+        if (idx >= 0 && idx < n) full[idx] = short[i];
+      }
+      return full;
     }
 
-    function render(idxNo: number) {
-      const it = indices[idxNo];
-      if (!it) return;
-      current = idxNo;
+    const fulls = baskets.map((b) => expand(b.flow || []));
+    const aggFull = expand(aggregate);
 
+    const sig = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
+    let chart: any = null;
+    let current = 0;
+    let zoom = { start: 92, end: 100 };
+
+    function render(idxNo: number) {
+      current = idxNo;
       const up = css('--up', '#d92d20');
       const down = css('--down', '#128a4e');
       const muted = css('--muted', '#6b7688');
       const line = css('--hairline', 'rgba(0,0,0,.08)');
       const text = css('--text-dim', '#4a5568');
 
-      const { flow, label } = seriesOf(it);
+      const basket = baskets[idxNo];
+      const flow = fulls[idxNo] ?? aggFull;
+      const label = basket ? `${basket.name} 篮子` : '六大宽基合计';
 
-      // candlestick 要 [开, 收, 低, 高]，我们存的是 [开, 收, 高, 低]
-      const ohlc = it.k.map((v: any) => (v ? [v[0], v[1], v[3], v[2]] : '-'));
+      // candlestick 要 [开, 收, 低, 高]，数据存的是 [开, 收, 高, 低]
+      const ohlc = kline.map((v: any) => (v ? [v[0], v[1], v[3], v[2]] : '-'));
 
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
 
-      const option = {
-        animation: false,
-        backgroundColor: 'transparent',
-        axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: muted } },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: { type: 'cross', crossStyle: { color: muted } },
-          backgroundColor: css('--surface', '#fff'),
-          borderColor: line,
-          textStyle: { color: text, fontSize: 12 },
-          formatter: (ps: any[]) => {
-            const i = ps[0]?.dataIndex ?? 0;
-            const v = it.k[i];
-            const f = flow[i] ?? 0;
-            const sg = (n: number) => (n >= 0 ? '+' : '') + n.toFixed(2);
-            let s = `<b>${dates[i]}</b>`;
-            if (v) {
-              const rising = v[1] >= v[0];
-              s +=
-                `<br/>开 ${v[0].toFixed(2)}　收 <b style="color:${rising ? up : down}">${v[1].toFixed(2)}</b>` +
-                `<br/>高 ${v[2].toFixed(2)}　低 ${v[3].toFixed(2)}`;
-            }
-            s +=
-              `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sg(f)} 亿</b>`;
-            return s;
-          },
-        },
-        grid: [
-          { left: 56, right: 18, top: 16, height: 210 },
-          { left: 56, right: 18, top: 258, height: 92 },
-        ],
-        xAxis: [
-          {
-            type: 'category',
-            data: dates,
-            gridIndex: 0,
-            boundaryGap: true,
-            axisLine: { lineStyle: { color: line } },
-            axisLabel: { show: false },
-            axisTick: { show: false },
-          },
-          {
-            type: 'category',
-            data: dates,
-            gridIndex: 1,
-            boundaryGap: true,
-            axisLine: { lineStyle: { color: line } },
-            axisTick: { show: false },
-            axisLabel: { color: muted, fontSize: 10, hideOverlap: true },
-          },
-        ],
-        yAxis: [
-          {
-            scale: true,
-            gridIndex: 0,
-            splitLine: { lineStyle: { color: line } },
-            axisLabel: { color: muted, fontSize: 11 },
-            axisLine: { show: false },
-            axisTick: { show: false },
-          },
-          {
-            gridIndex: 1,
-            splitLine: { show: false },
-            axisLabel: { show: false },
-            axisLine: { show: false },
-            axisTick: { show: false },
-          },
-        ],
-        dataZoom: [
-          { type: 'inside', xAxisIndex: [0, 1], start: zoom.start, end: zoom.end, minValueSpan: 8 },
-          {
-            type: 'slider',
-            xAxisIndex: [0, 1],
-            start: zoom.start,
-            end: zoom.end,
-            bottom: 6,
-            height: 20,
+      chart.setOption(
+        {
+          animation: false,
+          backgroundColor: 'transparent',
+          axisPointer: { link: [{ xAxisIndex: 'all' }] },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross', crossStyle: { color: muted } },
+            backgroundColor: css('--surface', '#fff'),
             borderColor: line,
-            fillerColor: css('--accent-tint', 'rgba(150,102,10,.12)'),
-            handleStyle: { color: css('--accent', '#96660a') },
-            moveHandleStyle: { color: css('--accent', '#96660a') },
-            dataBackground: {
-              lineStyle: { color: muted, opacity: 0.5 },
-              areaStyle: { color: muted, opacity: 0.12 },
+            textStyle: { color: text, fontSize: 12 },
+            formatter: (ps: any[]) => {
+              const i = ps[0]?.dataIndex ?? 0;
+              const v = kline[i];
+              const f = flow[i] ?? 0;
+              let s = `<b>${dates[i]}</b>`;
+              if (v) {
+                const rising = v[1] >= v[0];
+                s +=
+                  `<br/>开 ${v[0].toFixed(2)}　收 <b style="color:${rising ? up : down}">${v[1].toFixed(2)}</b>` +
+                  `<br/>高 ${v[2].toFixed(2)}　低 ${v[3].toFixed(2)}`;
+              }
+              if (i >= flowStart) s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
+              else s += '<br/><span style="opacity:.6">这天还没有 ETF 份额数据</span>';
+              return s;
             },
-            textStyle: { color: muted, fontSize: 10 },
           },
-        ],
-        series: [
-          {
-            name: 'K线',
-            type: 'candlestick',
-            data: ohlc,
-            itemStyle: { color: up, color0: down, borderColor: up, borderColor0: down },
-          },
-          {
-            name: '净流入',
-            type: 'bar',
-            xAxisIndex: 1,
-            yAxisIndex: 1,
-            data: flow.map((v: number) => ({
-              value: v,
-              itemStyle: { color: v >= 0 ? up : down, opacity: 0.8 },
-            })),
-          },
-        ],
-      };
+          grid: [
+            { left: 60, right: 18, top: 14, height: 208 },
+            { left: 60, right: 18, top: 256, height: 88 },
+          ],
+          xAxis: [
+            {
+              type: 'category',
+              data: dates,
+              gridIndex: 0,
+              boundaryGap: true,
+              axisLine: { lineStyle: { color: line } },
+              axisLabel: { show: false },
+              axisTick: { show: false },
+            },
+            {
+              type: 'category',
+              data: dates,
+              gridIndex: 1,
+              boundaryGap: true,
+              axisLine: { lineStyle: { color: line } },
+              axisTick: { show: false },
+              axisLabel: { color: muted, fontSize: 10, hideOverlap: true },
+            },
+          ],
+          yAxis: [
+            {
+              scale: true,
+              gridIndex: 0,
+              splitLine: { lineStyle: { color: line } },
+              axisLabel: { color: muted, fontSize: 11 },
+              axisLine: { show: false },
+              axisTick: { show: false },
+            },
+            {
+              gridIndex: 1,
+              splitLine: { show: false },
+              axisLabel: { show: false },
+              axisLine: { show: false },
+              axisTick: { show: false },
+            },
+          ],
+          dataZoom: [
+            { type: 'inside', xAxisIndex: [0, 1], start: zoom.start, end: zoom.end, minValueSpan: 8 },
+            {
+              type: 'slider',
+              xAxisIndex: [0, 1],
+              start: zoom.start,
+              end: zoom.end,
+              bottom: 6,
+              height: 20,
+              borderColor: line,
+              fillerColor: css('--accent-tint', 'rgba(150,102,10,.12)'),
+              handleStyle: { color: css('--accent', '#96660a') },
+              moveHandleStyle: { color: css('--accent', '#96660a') },
+              dataBackground: {
+                lineStyle: { color: muted, opacity: 0.5 },
+                areaStyle: { color: muted, opacity: 0.12 },
+              },
+              textStyle: { color: muted, fontSize: 10 },
+            },
+          ],
+          series: [
+            {
+              name: '上证指数',
+              type: 'candlestick',
+              data: ohlc,
+              itemStyle: { color: up, color0: down, borderColor: up, borderColor0: down },
+            },
+            {
+              name: '净流入',
+              type: 'bar',
+              xAxisIndex: 1,
+              yAxisIndex: 1,
+              data: flow.map((v: number) => ({
+                value: v,
+                itemStyle: { color: v >= 0 ? up : down, opacity: 0.8 },
+              })),
+            },
+          ],
+        },
+        true
+      );
 
-      chart.setOption(option, true);
       chart.off('dataZoom');
       chart.on('dataZoom', () => {
-        const m = chart.getOption().dataZoom?.[0];
-        if (m) zoom = { start: m.start, end: m.end };
+        const z = chart.getOption().dataZoom?.[0];
+        if (z) zoom = { start: z.start, end: z.end };
         updateLegend();
       });
 
-      updateLegend();
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
-
-      const n = dates.length;
-      note.textContent = basket
-        ? `柱子 = ${it.name} 下所有 ETF 的净流入合计`
-        : `上证综指没有规模够看的 ETF，柱子显示六大宽基合计`;
+      note.textContent = `柱子 = ${label} 每日净流入合计，只有 ${flowStart > 0 ? `${dates[flowStart]} 之后` : '有份额数据之后'}才有值`;
+      updateLegend();
 
       function updateLegend() {
-        const opt = chart.getOption().dataZoom?.[0];
-        const s = Math.round(opt?.start ?? 0);
-        const e = Math.round(opt?.end ?? 100);
+        const z = chart.getOption().dataZoom?.[0];
+        const s = Math.round(z?.start ?? 0);
+        const e = Math.round(z?.end ?? 100);
         const i0 = Math.floor((s / 100) * (n - 1));
         const i1 = Math.max(i0, Math.ceil((e / 100) * (n - 1)));
-        const slice = flow.slice(i0, i1 + 1).filter((x: number) => x !== 0);
+        const slice = flow.slice(i0, i1 + 1);
         const total = slice.reduce((a: number, b: number) => a + b, 0);
+        const hasFlow = i1 >= flowStart;
         const last = flow[n - 1] ?? 0;
-        const sg = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
 
-        legend.innerHTML =
-          `<span>当天（${dates[n - 1]}） <strong class="${last >= 0 ? 'up' : 'down'}">${sg(last)} 亿</strong></span>` +
-          `<span>可见区间累计 <strong class="${total >= 0 ? 'up' : 'down'}">${
-            total >= 0 ? '+' : ''
-          }${total.toFixed(0)} 亿</strong></span>` +
-          `<span class="dim">${dates[i0]} ~ ${dates[i1]}</span>`;
+        legend.innerHTML = hasFlow
+          ? `<span>当天（${dates[n - 1]}） <strong class="${last >= 0 ? 'up' : 'down'}">${sig(last)} 亿</strong></span>` +
+            `<span>可见区间累计 <strong class="${total >= 0 ? 'up' : 'down'}">${sig(total).replace(
+              /\.\d+$/,
+              ''
+            )} 亿</strong></span>` +
+            `<span class="dim">${dates[i0]} ~ ${dates[i1]}</span>`
+          : `<span class="dim">这一段只有 K 线，ETF 份额从 ${dates[flowStart] || '近一年'} 才开始有</span>` +
+            `<span class="dim">${dates[i0]} ~ ${dates[i1]}</span>`;
       }
     }
 
@@ -266,10 +276,7 @@ const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x
 
     render(0);
 
-    const onResize = () => chart?.resize();
-    window.addEventListener('resize', onResize);
-
-    // 主题切换后重画，否则颜色还是旧的
+    window.addEventListener('resize', () => chart?.resize());
     new MutationObserver(() => render(current)).observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-theme', 'class'],
@@ -344,7 +351,7 @@ const indices = (data?.indices ?? []).filter((x: any) => Array.isArray(x.k) && x
 
   .fc__canvas {
     width: 100%;
-    height: 386px;
+    height: 384px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
