@@ -570,14 +570,14 @@ function yamlStr(text) {
 
 function table(rows, withAmount) {
   const head = withAmount
-    ? '| 估算净流入(亿元) | 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 |'
+    ? '| 代码 | 名称 | 估算净流入(亿元) | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 |'
     : '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 |';
-  const sep = withAmount ? '|---:|---|---|---:|---:|---:|---:|' : '|---|---|---:|---:|---:|---:|';
+  const sep = withAmount ? '|---|---|---:|---:|---:|---:|---:|' : '|---|---|---:|---:|---:|---:|';
   const body = rows.map((r) => {
-    const cells = [];
-    // 金额放第一列：它既是排序依据，也是读者最先想看的
+    const cells = [r.code, shortName(r.name) + (r.newIn ? '（新）' : '')];
+    // 金额紧跟名称：它既是排序依据，也是读者最先想看的
     if (withAmount) cells.push(money(r.amount));
-    cells.push(r.code, shortName(r.name) + (r.newIn ? '（新）' : ''), r.sc != null ? r.sc.toFixed(1) : '—');
+    cells.push(r.sc != null ? r.sc.toFixed(1) : '—');
     cells.push(`${r.delta > 0 ? '+' : ''}${yi(r.delta)}`);
     cells.push(pct(r.deltaPct), r.chgPct == null ? '—' : pct(r.chgPct));
     return '| ' + cells.join(' | ') + ' |';
