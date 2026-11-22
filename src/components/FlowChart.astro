@@ -95,12 +95,22 @@ const baskets: any[] = data?.baskets ?? [];
 
     const css = (k: string, fb: string) => getComputedStyle(document.documentElement).getPropertyValue(k).trim() || fb;
 
-    /** 把「只有最近一年」的资金流铺到全历史时间轴上 */
+    /**
+     * 把「只有 2016 年之后」的资金流铺到全历史时间轴上。
+     *
+     * ⚠️ 必须按日期对齐，不能按索引偏移：份额日期和 K 线日期之间有断档
+     * （跨年第一天常见，比如 2017-12-29 直接跳到 2018-01-03），
+     * 按索引铺每遇一个断档就整体错一天，累计能错七天，
+     * 表现出来就是某天的资金流被安到了别的日期上。
+     */
+    const flowDates: string[] = data.flowDates || [];
+    const dateIdx = new Map(dates.map((d, i) => [d, i]));
+
     function expand(short: number[]): number[] {
       const full = new Array(n).fill(0);
-      for (let i = 0; i < short.length; i++) {
-        const idx = flowStart + i;
-        if (idx >= 0 && idx < n) full[idx] = short[i];
+      for (let i = 0; i < flowDates.length; i++) {
+        const j = dateIdx.get(flowDates[i]);
+        if (j !== undefined && short[i] !== undefined) full[j] = short[i];
       }
       return full;
     }
