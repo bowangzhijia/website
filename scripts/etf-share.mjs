@@ -236,7 +236,13 @@ async function fetchEmQuotes(items) {
       const close = Number(d.f2);
       const chg = Number(d.f3);
       if (Number.isFinite(close) && close > 0) {
-        quotes.set(String(d.f12), { close, chgPct: Number.isFinite(chg) ? chg : null });
+        // 东财的名称带基金公司（「通信ETF国泰」），交易所只给简称（「通信ETF」），
+        // 按「通信ETF国泰」搜本来是搜不到的，所以顺手把名称也带回来
+        quotes.set(String(d.f12), {
+          close,
+          chgPct: Number.isFinite(chg) ? chg : null,
+          name: String(d.f14 || '').trim(),
+        });
       }
     }
     await sleep(120);
@@ -388,6 +394,8 @@ async function collectDay(date) {
     if (q) {
       it.close = q.close;
       it.chgPct = q.chgPct;
+      // 东财名称更完整（带基金公司），只在更长时替换，避免被错的简称覆盖
+      if (q.name && q.name.length > it.name.length) it.name = q.name;
       priced++;
     }
   }
@@ -461,7 +469,7 @@ function computeChanges(date) {
     // 新上市 / 前一交易日没数据 → 跳过，不能当成巨额申购
     if (!p || !p.share || p.share < MIN_PREV_SHARE) continue;
     const delta = it.share - p.share;
-    if (delta === 0) continue;
+    // 份额没变的也要留：搜索框要能查到任意一只，不然抽查某只查不到会以为数据缺了
     const sc = scaleOf(it.share, it.close);
     const prevSc = scaleOf(p.share, p.close ?? it.close);
 
@@ -622,10 +630,11 @@ function buildArticle(date, { prev, rows }, dates) {
   lines.push(`> 数据：上交所 / 深交所官方披露，统计日 **${date}**，对比上一交易日 ${prev}。`);
   lines.push('');
 
+  const changed = rows.filter((r) => r.delta !== 0);
   lines.push('## 一句话');
   lines.push('');
   lines.push(
-    `全市场 ${rows.length} 只有份额变动` +
+    `全市场 ${rows.length} 只 ETF 里 ${changed.length} 只有份额变动` +
       (hasPrice ? `，合计净流入 **${money(totalAmount)} 亿元**` : '') +
       `。规模 10 亿以上的 ${pool.length} 只里，**${inflow.length} 只净申购**、**${outflow.length} 只净赎回**。`
   );
@@ -755,6 +764,7 @@ function writeLatest(date, { prev, rows }, dates) {
     prevDate: prev,
     generatedAt: new Date().toISOString(),
     total: snap?.items.length || 0,
+    changed: rows.filter((r) => r.delta !== 0).length,
     inflowCount: rows.filter((r) => r.delta > 0).length,
     outflowCount: rows.filter((r) => r.delta < 0).length,
     netAmount: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) / 1e6) / 100,
@@ -806,7 +816,7 @@ function generateArticle(date) {
     console.log(`   没有前一交易日的快照，本次不出文章（先补历史：--days=N）`);
     return null;
   }
-  if (!changes.rows.length) {
+  if (!changes.rows.some((r) => r.delta !== 0)) {
     console.log('   份额没有变动，本次不出文章');
     return null;
   }
@@ -823,7 +833,7 @@ function generateArticle(date) {
   const { title, body } = buildArticle(date, changes, dates);
   writeFileSync(file, body, 'utf8');
   console.log(`   ✔ 已生成文章 ${file}`);
-  console.log(`     ${title}｜${changes.rows.length} 只有变动`);
+  console.log(`     ${title}｜${changes.rows.filter((r) => r.delta !== 0).length} 只有变动`);
   return file;
 }
 
