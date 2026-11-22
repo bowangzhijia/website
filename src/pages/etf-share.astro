@@ -46,9 +46,9 @@ const streak = rows
   .sort((a, b) => b.st - a.st)
   .slice(0, 10);
 
-const broad = rows.filter((r) => r.b);
-const sector = rows.filter((r) => !r.b);
-const sumBy = (arr: any[]) => arr.reduce((s, r) => s + (hasPrice ? r.amt || 0 : r.d || 0), 0);
+/** 宽基篮子（按指数加总，配置见 src/data/etf-share/baskets.json） */
+const baskets: any[] = data?.baskets ?? [];
+const basketAmount = baskets.reduce((s: number, b: any) => s + (b.amt || 0), 0);
 
 const [, mm, dd] = (data?.date || '---- -- --').split('-');
 const dateLabel = mm ? `${Number(mm)}月${Number(dd)}日` : '';
@@ -99,20 +99,35 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
             </div>
           </div>
 
-          <div class="split">
-            <div class="split__item">
-              <span>宽基（{broad.length} 只）</span>
-              <strong class={sumBy(broad) >= 0 ? 'up' : 'down'}>
-                {n2(sumBy(broad))}{hasPrice ? ' 亿元' : ' 亿份'}
-              </strong>
-            </div>
-            <div class="split__item">
-              <span>行业主题（{sector.length} 只）</span>
-              <strong class={sumBy(sector) >= 0 ? 'up' : 'down'}>
-                {n2(sumBy(sector))}{hasPrice ? ' 亿元' : ' 亿份'}
-              </strong>
-            </div>
-          </div>
+          {baskets.length > 0 && (
+            <section class="bk">
+              <div class="bk__head">
+                <h2 class="bk__h">宽基篮子</h2>
+                <p class="bk__sub">
+                  一个指数挂十几只 ETF，是同一份敞口。汇金买哪只都一样，加总才看得出进了多少钱。
+                </p>
+              </div>
+              <div class="bk__grid">
+                {baskets.map((b: any) => (
+                  <div class="bk__card" title={b.desc}>
+                    <div class="bk__name">
+                      {b.name}
+                      <span class="bk__n">{b.n} 只</span>
+                    </div>
+                    <div class={`bk__v ${b.amt >= 0 ? 'up' : 'down'}`}>
+                      {n2(b.amt)}
+                      <span class="bk__u">亿</span>
+                    </div>
+                    <div class="bk__scale">篮子规模 {Math.round(b.s)} 亿</div>
+                  </div>
+                ))}
+              </div>
+              <p class="bk__foot">
+                篮子合计 <strong class={basketAmount >= 0 ? 'up' : 'down'}>{n2(basketAmount)} 亿</strong>
+                ，其余 {rows.length - baskets.reduce((s: number, b: any) => s + (b.n || 0), 0)} 行变动来自行业主题、跨境、债券和商品。
+              </p>
+            </section>
+          )}
 
           {/* 搜索是全量 987 行，静态渲染太重，交给 JS 过滤 */}
           <div class="sr">
@@ -318,6 +333,82 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     color: var(--muted);
   }
 
+  /* 宽基篮子 */
+  .bk {
+    margin-bottom: 26px;
+  }
+
+  .bk__head {
+    margin-bottom: 12px;
+  }
+
+  .bk__h {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+
+  .bk__sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .bk__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .bk__card {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+  }
+
+  .bk__name {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .bk__n {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .bk__v {
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .bk__u {
+    font-size: 13px;
+    font-weight: 400;
+    margin-left: 2px;
+  }
+
+  .bk__scale {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .bk__foot {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
   .sr {
     margin-bottom: 30px;
     padding: 16px;
@@ -386,8 +477,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       grid-template-columns: repeat(2, 1fr);
     }
 
-    .split {
-      grid-template-columns: 1fr;
+    .bk__grid {
+      grid-template-columns: repeat(2, 1fr);
     }
 
     .sc__title {

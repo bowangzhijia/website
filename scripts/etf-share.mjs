@@ -459,6 +459,46 @@ function computeChanges(date) {
   return { prev: prevDate, rows };
 }
 
+/** 宽基篮子配置（人工维护，交易所接口不给跟踪标的） */
+function loadBaskets() {
+  const p = join(DATA_DIR, 'baskets.json');
+  if (!existsSync(p)) return [];
+  try {
+    return JSON.parse(readFileSync(p, 'utf8')).baskets || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 按指数归集。同一个指数下挂十几只 ETF，是同一份敞口——
+ * 汇金买 510300 还是 510310 没有区别，分散在单只榜里根本看不出资金规模。
+ */
+function computeBaskets(date, rows) {
+  const snap = loadSnapshot(date);
+  const byCode = new Map((snap?.items || []).map((x) => [x.code, x]));
+  const changeByCode = new Map(rows.map((r) => [r.code, r]));
+
+  return loadBaskets().map((b) => {
+    let delta = 0;
+    let amount = 0;
+    let scale = 0;
+    let n = 0;
+    for (const code of b.codes) {
+      const it = byCode.get(code);
+      if (!it) continue; // 已退市或还没上市，跳过
+      n++;
+      scale += it.share * (it.close || 0);
+      const ch = changeByCode.get(code);
+      if (ch) {
+        delta += ch.delta;
+        amount += ch.amount || 0;
+      }
+    }
+    return { id: b.id, name: b.name, desc: b.desc || '', n, delta, amount, scale };
+  }).filter((b) => b.n > 0);
+}
+
 /** 连续同向天数（从最近往前数，含今天这次变化） */
 function consecutiveDays(code, dates, dir) {
   let n = 0;
@@ -622,20 +662,37 @@ function buildArticle(date, { prev, rows }, dates) {
     }
   }
 
-  // 宽基 vs 行业主题
-  const broad = rows.filter((r) => isBroad(r.name));
-  const sector = rows.filter((r) => !isBroad(r.name));
-  if (broad.length && sector.length) {
-    const sum = (arr) => arr.reduce((s, r) => s + (r[hasPrice ? 'amount' : 'delta'] || 0), 0);
-    const fmt = (v) => (v > 0 ? '+' : '') + (hasPrice ? money(v) : yi(v));
-    // 不同 ETF 单价差好几倍，份数直接相加没意义，有价格就用金额
-    lines.push('## 宽基 vs 行业主题');
+  // 宽基篮子：同一指数下的 ETF 加总
+  const baskets = computeBaskets(date, rows);
+  if (baskets.length) {
+    lines.push('## 宽基篮子');
     lines.push('');
-    lines.push(`| 类别 | 只数 | ${hasPrice ? '估算净流入(亿元)' : '合计份额变化(亿份)'} |`);
-    lines.push('|---|---:|---:|');
-    lines.push(`| 宽基 | ${broad.length} | ${fmt(sum(broad))} |`);
-    lines.push(`| 行业主题 | ${sector.length} | ${fmt(sum(sector))} |`);
+    lines.push(
+      '一个指数挂十几只 ETF，是同一份敞口。汇金买 510300 还是 510310 没有区别，' +
+        '分散在单只榜里根本看不出进了多少钱，加总才准。'
+    );
     lines.push('');
+    lines.push(`| 指数 | 只数 | ${hasPrice ? '净流入(亿元)' : '份额变化(亿份)'} | 篮子规模(亿元) |`);
+    lines.push('|---|---:|---:|---:|');
+    for (const b of baskets) {
+      const v = hasPrice ? b.amount : b.delta;
+      lines.push(`| ${b.name} | ${b.n} | ${v ? (v > 0 ? '+' : '') + (hasPrice ? money(v) : yi(v)) : '—'} | ${money(b.scale)} |`);
+    }
+    lines.push('');
+
+    // 篮子之外的全部算「其它」，不再用名称猜宽基（「300」里有纳斯达克、「50」里有中概互联）
+    const inBasket = new Set(loadBaskets().flatMap((b) => b.codes));
+    const other = rows.filter((r) => !inBasket.has(r.code));
+    if (other.length) {
+      const otherAmount = other.reduce((s, r) => s + (r.amount || 0), 0);
+      const inAmount = baskets.reduce((s, b) => s + b.amount, 0);
+      lines.push(
+        `篮子之外的 ${other.length} 只（行业主题、跨境、债券、商品）合计 ` +
+          `${hasPrice ? (otherAmount > 0 ? '+' : '') + money(otherAmount) + ' 亿元' : yi(other.reduce((s, r) => s + r.delta, 0)) + ' 亿份'}，` +
+          `宽基篮子合计 ${(inAmount > 0 ? '+' : '') + money(inAmount)} 亿元。`
+      );
+      lines.push('');
+    }
   }
 
   lines.push('---');
@@ -665,6 +722,15 @@ function writeLatest(date, { prev, rows }, dates) {
     outflowCount: rows.filter((r) => r.delta < 0).length,
     netAmount: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) / 1e6) / 100,
     hasPrice: rows.some((r) => r.amount != null),
+    baskets: computeBaskets(date, rows).map((b) => ({
+      id: b.id,
+      name: b.name,
+      desc: b.desc,
+      n: b.n,
+      d: Math.round(b.delta / 1e6) / 100,
+      amt: Math.round(b.amount / 1e6) / 100,
+      s: Math.round(b.scale / 1e6) / 100,
+    })),
     rows: rows
       .map((r) => ({
         c: r.code,
