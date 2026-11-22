@@ -939,6 +939,32 @@ async function fetchTencentClose(code, from, to) {
 }
 
 /**
+ * 新浪日 K，一次最多 1023 条（约四年）。
+ * 腾讯被 WAF 拦的时候用它兜底——补历史时两只价格源来回打，很容易撞限流。
+ */
+async function fetchSinaClose(code, from, to) {
+  const sym = `${code.startsWith('15') ? 'sz' : 'sh'}${code}`;
+  const url =
+    'https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData' +
+    `?symbol=${sym}&scale=240&ma=no&datalen=1023`;
+  const rows = await fetchJson(url, { 'User-Agent': UA, Referer: 'https://finance.sina.com.cn/' }, `新浪K线 ${code}`, 2);
+  const out = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const close = Number(r.close);
+    if (r.day >= from && r.day <= to && Number.isFinite(close) && close > 0) out.set(r.day, close);
+  }
+  return out;
+}
+
+/** 收盘价：腾讯优先，拿不到换新浪 */
+async function fetchEtfClose(code, from, to) {
+  const tx = await fetchTencentClose(code, from, to);
+  if (tx.size > 0) return tx;
+  console.warn(`   腾讯拿不到 ${code} 的价格，换新浪`);
+  return fetchSinaClose(code, from, to);
+}
+
+/**
  * 深市单只 ETF 的历史逐日份额。
  *
  * fund_jjgm 传代码 + 日期区间能一次拿多天，但区间超过约 170 自然日就返回空，
@@ -1063,7 +1089,7 @@ async function flowsFromExchange(bars, fromDate, toDate) {
   console.log('   抓成分 ETF 的历史价格（腾讯）…');
   const px = new Map();
   for (const code of inBasket) {
-    px.set(code, await fetchTencentClose(code, from, to));
+    px.set(code, await fetchEtfClose(code, from, to));
     await sleep(80);
   }
 
