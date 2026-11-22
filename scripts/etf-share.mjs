@@ -1068,10 +1068,16 @@ async function buildHistory(deepBars = 0) {
     await sleep(120);
   }
 
+  // 六大宽基合计。上证综指没有规模够看的 ETF，选它时下面就用这条
+  const aggregate = dates.map((_, i) =>
+    Math.round(Object.values(flows).reduce((s, f) => s + (f[i] || 0), 0) * 100) / 100
+  );
+
   const out = {
     updated: new Date().toISOString(),
     dates,
     baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
+    aggregate,
     indices,
   };
   writeFileSync(histPath, JSON.stringify(out), 'utf8');
