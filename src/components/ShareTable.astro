@@ -1,0 +1,149 @@
+---
+/**
+ * 份额榜单表格。默认按份额变化排序，调用方负责排序和截断。
+ *
+ * 红涨绿跌，跟国内看盘软件一致（--up 是红、--down 是绿）。
+ */
+interface Row {
+  c: string; // 代码
+  n: string; // 名称
+  m: string; // 市场 sh/sz
+  s: number; // 份额(亿份)
+  d: number; // 份额变化(亿份)
+  p: number; // 变化率 %
+  px: number | null; // 收盘价
+  chg: number | null; // 涨跌幅 %
+  amt: number | null; // 估算净流入(亿元)
+  b: number; // 是否宽基
+  st: number; // 连续同向天数
+}
+
+interface Props {
+  rows: Row[];
+  hasPrice: boolean;
+  showStreak?: boolean;
+}
+
+const { rows, hasPrice, showStreak = false } = Astro.props;
+
+const sign = (v: number | null, digits = 2, suffix = '') =>
+  v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(digits) + suffix;
+const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : 'down');
+---
+
+<div class="tbl">
+  <table>
+    <thead>
+      <tr>
+        <th>代码</th>
+        <th>名称</th>
+        <th class="r">份额(亿份)</th>
+        <th class="r">变化</th>
+        <th class="r">变化率</th>
+        <th class="r">涨跌幅</th>
+        {hasPrice && <th class="r">净流入(亿元)</th>}
+        {showStreak && <th class="r">连续</th>}
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((r) => (
+          <tr>
+            <td class="code">{r.c}</td>
+            <td class="nm">
+              {r.n}
+              {r.b ? <span class="tag">宽基</span> : null}
+            </td>
+            <td class="r">{r.s.toFixed(2)}</td>
+            <td class={`r ${tone(r.d)}`}>{sign(r.d)}</td>
+            <td class={`r ${tone(r.p)}`}>{sign(r.p, 2, '%')}</td>
+            <td class={`r ${tone(r.chg)}`}>{sign(r.chg, 2, '%')}</td>
+            {hasPrice && <td class={`r ${tone(r.amt)}`}>{sign(r.amt)}</td>}
+            {showStreak && <td class="r dim">{r.st >= 2 ? r.st + ' 天' : '—'}</td>}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .tbl {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 620px;
+  }
+
+  th,
+  td {
+    padding: 9px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--thead-fill);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-align: left;
+    backdrop-filter: blur(6px);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  tbody tr:hover {
+    background: var(--hover-fill);
+  }
+
+  .r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .code {
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .nm {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .up {
+    color: var(--up);
+  }
+
+  .down {
+    color: var(--down);
+  }
+
+  .dim {
+    color: var(--muted);
+  }
+
+  .tag {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--chip-fill);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+  }
+</style>

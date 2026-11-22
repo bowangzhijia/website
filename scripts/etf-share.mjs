@@ -308,6 +308,7 @@ function saveSnapshot(snap) {
   const dir = join(DATA_DIR, 'daily');
   mkdirSync(dir, { recursive: true });
   writeFileSync(snapshotPath(snap.date), JSON.stringify(snap), 'utf8');
+  _snapCache.set(snap.date, snap);
 }
 
 /** 已有的历史快照，按日期升序 */
@@ -330,14 +331,21 @@ function pruneOldSnapshots() {
   if (extra.length) console.log(`   清理 ${extra.length} 个过期快照（保留最近 ${KEEP_DAYS} 个交易日）`);
 }
 
+const _snapCache = new Map();
+
 function loadSnapshot(date) {
+  if (_snapCache.has(date)) return _snapCache.get(date);
   const p = snapshotPath(date);
-  if (!existsSync(p)) return null;
-  try {
-    return JSON.parse(readFileSync(p, 'utf8'));
-  } catch {
-    return null;
+  let data = null;
+  if (existsSync(p)) {
+    try {
+      data = JSON.parse(readFileSync(p, 'utf8'));
+    } catch {
+      data = null;
+    }
   }
+  _snapCache.set(date, data);
+  return data;
 }
 
 // ============================================================
@@ -640,6 +648,44 @@ function buildArticle(date, { prev, rows }, dates) {
   return { title, summary, body: lines.join('\n') };
 }
 
+/**
+ * 给看板页用的汇总数据。
+ * 字段名缩写是为了控制体积——1699 行全塞进页面里，长字段名会多出几十 KB。
+ */
+function writeLatest(date, { prev, rows }, dates) {
+  const snap = loadSnapshot(date);
+  const pyi = (v) => Math.round(v / 1e6) / 100; // 份 → 亿份，2 位小数
+
+  const out = {
+    date,
+    prevDate: prev,
+    generatedAt: new Date().toISOString(),
+    total: snap?.items.length || 0,
+    inflowCount: rows.filter((r) => r.delta > 0).length,
+    outflowCount: rows.filter((r) => r.delta < 0).length,
+    netAmount: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) / 1e6) / 100,
+    hasPrice: rows.some((r) => r.amount != null),
+    rows: rows
+      .map((r) => ({
+        c: r.code,
+        n: r.name,
+        m: r.market,
+        s: pyi(r.share),
+        d: pyi(r.delta),
+        p: +r.deltaPct.toFixed(2),
+        px: r.close ?? null,
+        chg: r.chgPct ?? null,
+        amt: r.amount == null ? null : Math.round(r.amount / 1e6) / 100,
+        b: isBroad(r.name) ? 1 : 0,
+        st: consecutiveDays(r.code, dates, r.delta > 0 ? 1 : -1),
+      }))
+      .sort((a, b) => b.d - a.d),
+  };
+
+  writeFileSync(join(DATA_DIR, 'latest.json'), JSON.stringify(out), 'utf8');
+  console.log(`   ✔ 已更新 latest.json（${out.rows.length} 行）`);
+}
+
 function generateArticle(date) {
   const dates = listSnapshots();
   const changes = computeChanges(date);
@@ -652,6 +698,9 @@ function generateArticle(date) {
     console.log('   份额没有变动，本次不出文章');
     return null;
   }
+
+  // 看板数据每次都要刷新，哪怕文章早就写过了
+  writeLatest(date, changes, dates);
 
   const file = join(POSTS_DIR, `etf-share-${date}.md`);
   if (existsSync(file)) {

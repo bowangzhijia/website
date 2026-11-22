@@ -87,6 +87,16 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
             )
           }
 
+          {/* 份额看板只在 ETF 栏目露出，其它栏目没有这个东西 */}
+          {
+            column.id === 'etf-boduan-wang' && (
+              <a class="sharelink" href="/etf-share/">
+                <span class="sharelink__t">ETF 份额看板</span>
+                <span class="sharelink__d">看每天谁在真金白银地买</span>
+              </a>
+            )
+          }
+
           <div id="subscribe">
             {isMessage ? <MessageForm /> : <SubscribeForm />}
           </div>
@@ -211,6 +221,35 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
     font-size: 14px;
     line-height: 1.7;
     margin: 0;
+  }
+
+  /* 份额看板入口 */
+  .sharelink {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 14px;
+    padding: 10px 16px;
+    border: 1px solid var(--accent-border);
+    border-radius: 10px;
+    background: var(--accent-tint);
+    text-decoration: none;
+    transition: background 0.18s ease;
+  }
+
+  .sharelink:hover {
+    background: var(--accent-wash);
+  }
+
+  .sharelink__t {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .sharelink__d {
+    font-size: 12px;
+    color: var(--muted);
   }
 
   #subscribe {

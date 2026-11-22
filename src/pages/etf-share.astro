@@ -1,0 +1,447 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ShareTable from '../components/ShareTable.astro';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+/**
+ * ETF 份额看板。
+ *
+ * 数据全部来自构建时读的 latest.json（由 scripts/etf-share.mjs 每天生成），
+ * 页面本身不发请求，纯静态。
+ *
+ * 注意：这里用 process.cwd()（项目根）而不是 import.meta.url——
+ * Astro 构建时后者会被改写成别的路径，existsSync 直接 false，页面就空了。
+ */
+
+const dataPath = join(process.cwd(), 'src', 'data', 'etf-share', 'latest.json');
+
+let data: any = null;
+if (existsSync(dataPath)) {
+  try {
+    data = JSON.parse(readFileSync(dataPath, 'utf8'));
+  } catch {
+    data = null;
+  }
+}
+
+const rows: any[] = data?.rows ?? [];
+const hasPrice = !!data?.hasPrice;
+
+/** 与脚本一致：反直觉榜要有绝对额门槛，否则全是小 ETF */
+const bigEnough = (r: any) => (r.amt != null ? Math.abs(r.amt) >= 5 : Math.abs(r.d) >= 1);
+
+const inflow = rows.filter((r) => r.d > 0).slice(0, 12);
+const outflow = [...rows].filter((r) => r.d < 0).sort((a, b) => a.d - b.d).slice(0, 12);
+const upRedeem = rows
+  .filter((r) => r.chg != null && r.chg > 0 && r.d < 0 && bigEnough(r))
+  .sort((a, b) => (a.amt ?? a.d) - (b.amt ?? b.d))
+  .slice(0, 10);
+const downBuy = rows
+  .filter((r) => r.chg != null && r.chg < 0 && r.d > 0 && bigEnough(r))
+  .sort((a, b) => (b.amt ?? b.d) - (a.amt ?? a.d))
+  .slice(0, 10);
+const streak = rows
+  .filter((r) => r.d > 0 && r.st >= 3)
+  .sort((a, b) => b.st - a.st)
+  .slice(0, 10);
+
+const broad = rows.filter((r) => r.b);
+const sector = rows.filter((r) => !r.b);
+const sumBy = (arr: any[]) => arr.reduce((s, r) => s + (hasPrice ? r.amt || 0 : r.d || 0), 0);
+
+const [, mm, dd] = (data?.date || '---- -- --').split('-');
+const dateLabel = mm ? `${Number(mm)}月${Number(dd)}日` : '';
+
+const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
+---
+
+<BaseLayout
+  title="ETF 份额看板"
+  description="按日追踪沪深两市 ETF 份额变化，看主力资金是真申购还是假热闹。"
+>
+  <section class="screen">
+    <div class="wrap sc">
+      <header class="sc__head">
+        <a class="sc__back" href="/columns/etf-boduan-wang/">← ETF基金波段王</a>
+        <h1 class="sc__title">ETF 份额看板</h1>
+        <p class="sc__lead">
+          {
+            data
+              ? `${dateLabel} 数据，对比上一交易日（${data.prevDate}）。份额是真金白银的申购赎回，规模涨可能只是净值涨。`
+              : '还没有数据。等每日任务跑一次就会出来。'
+          }
+        </p>
+      </header>
+
+      {data && (
+        <>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__k">净申购</span>
+              <strong class="stat__v up">{data.inflowCount}</strong>
+              <span class="stat__u">只</span>
+            </div>
+            <div class="stat">
+              <span class="stat__k">净赎回</span>
+              <strong class="stat__v down">{data.outflowCount}</strong>
+              <span class="stat__u">只</span>
+            </div>
+            <div class="stat">
+              <span class="stat__k">合计净流入</span>
+              <strong class={`stat__v ${data.netAmount >= 0 ? 'up' : 'down'}`}>{n2(data.netAmount)}</strong>
+              <span class="stat__u">亿元</span>
+            </div>
+            <div class="stat">
+              <span class="stat__k">覆盖</span>
+              <strong class="stat__v">{data.total}</strong>
+              <span class="stat__u">只 ETF</span>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="split__item">
+              <span>宽基（{broad.length} 只）</span>
+              <strong class={sumBy(broad) >= 0 ? 'up' : 'down'}>
+                {n2(sumBy(broad))}{hasPrice ? ' 亿元' : ' 亿份'}
+              </strong>
+            </div>
+            <div class="split__item">
+              <span>行业主题（{sector.length} 只）</span>
+              <strong class={sumBy(sector) >= 0 ? 'up' : 'down'}>
+                {n2(sumBy(sector))}{hasPrice ? ' 亿元' : ' 亿份'}
+              </strong>
+            </div>
+          </div>
+
+          {/* 搜索是全量 987 行，静态渲染太重，交给 JS 过滤 */}
+          <div class="sr">
+            <label class="sr__label" for="q">查单只</label>
+            <input
+              class="sr__input"
+              id="q"
+              type="search"
+              placeholder="代码或名称，例如 510300 / 沪深300"
+              autocomplete="off"
+            />
+            <div class="sr__hint" id="sr-hint"></div>
+            <div class="sr__wrap" id="sr-wrap" hidden>
+              <table class="sr__table">
+                <thead>
+                  <tr>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th class="r">份额(亿份)</th>
+                    <th class="r">变化</th>
+                    <th class="r">变化率</th>
+                    <th class="r">涨跌幅</th>
+                    {hasPrice && <th class="r">净流入(亿元)</th>}
+                  </tr>
+                </thead>
+                <tbody id="sr-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          {inflow.length > 0 && (
+            <section class="blk">
+              <h2 class="blk__h">净申购 TOP 12</h2>
+              <ShareTable rows={inflow} hasPrice={hasPrice} showStreak />
+            </section>
+          )}
+
+          {outflow.length > 0 && (
+            <section class="blk">
+              <h2 class="blk__h">净赎回 TOP 12</h2>
+              <ShareTable rows={outflow} hasPrice={hasPrice} showStreak />
+            </section>
+          )}
+
+          {upRedeem.length > 0 && (
+            <section class="blk">
+              <h2 class="blk__h">涨了，份额却在减</h2>
+              <p class="blk__tip">价格涨、份额降，有资金借着上涨离场。只列 5 亿元以上的。</p>
+              <ShareTable rows={upRedeem} hasPrice={hasPrice} />
+            </section>
+          )}
+
+          {downBuy.length > 0 && (
+            <section class="blk">
+              <h2 class="blk__h">跌了，份额反而增</h2>
+              <p class="blk__tip">价格跌、份额涨，是逆势抄底的动作。只列 5 亿元以上的。</p>
+              <ShareTable rows={downBuy} hasPrice={hasPrice} showStreak />
+            </section>
+          )}
+
+          {streak.length > 0 && (
+            <section class="blk">
+              <h2 class="blk__h">连续净申购 3 天以上</h2>
+              <p class="blk__tip">连着几天都在被买，比单日的猛增更值得留意。</p>
+              <ShareTable rows={streak} hasPrice={hasPrice} showStreak />
+            </section>
+          )}
+
+          <p class="foot">
+            数据来自上交所 / 深交所官方披露，金额按当日收盘价折算，是估算值。
+            新上市 ETF 首日无份额，已跳过；份额拆分或大额申购会在文章里单独说明。
+          </p>
+        </>
+      )}
+    </div>
+  </section>
+
+  <script type="application/json" id="etf-data" is:inline set:html={JSON.stringify(rows)}></script>
+</BaseLayout>
+
+<script>
+  const el = document.getElementById('etf-data');
+  const input = document.getElementById('q') as HTMLInputElement | null;
+  const body = document.getElementById('sr-body');
+  const wrap = document.getElementById('sr-wrap');
+  const hint = document.getElementById('sr-hint');
+
+  if (el && input && body && wrap && hint) {
+    const rows: any[] = JSON.parse(el.textContent || '[]');
+    const hasPrice = rows.some((r) => r.amt != null);
+
+    const sign = (v: number | null, suffix = '') =>
+      v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + suffix;
+    const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : 'down');
+
+    const render = (list: any[]) => {
+      body.innerHTML = '';
+      for (const r of list) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          `<td class="code">${r.c}</td><td>${r.n}</td>` +
+          `<td class="r">${r.s.toFixed(2)}</td>` +
+          `<td class="r ${tone(r.d)}">${sign(r.d)}</td>` +
+          `<td class="r ${tone(r.p)}">${sign(r.p, '%')}</td>` +
+          `<td class="r ${tone(r.chg)}">${sign(r.chg, '%')}</td>` +
+          (hasPrice ? `<td class="r ${tone(r.amt)}">${sign(r.amt)}</td>` : '');
+        body.appendChild(tr);
+      }
+    };
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        wrap.hidden = true;
+        hint.textContent = '';
+        return;
+      }
+      const hit = rows.filter((r) => r.c.includes(q) || r.n.toLowerCase().includes(q));
+      wrap.hidden = hit.length === 0;
+      hint.textContent = hit.length ? `匹配 ${hit.length} 只，显示前 30 只` : '没找到这只 ETF';
+      render(hit.slice(0, 30));
+    });
+  }
+</script>
+
+<style>
+  .sc {
+    padding: 28px 0 calc(48px + var(--tabbar-h, 0px));
+  }
+
+  .sc__back {
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  .sc__back:hover {
+    color: var(--accent);
+  }
+
+  .sc__title {
+    margin: 10px 0 8px;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+  }
+
+  .sc__lead {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 22px 0 14px;
+  }
+
+  .stat {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+  }
+
+  .stat__k {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .stat__v {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .stat__u {
+    margin-left: 4px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+
+  .split__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .sr {
+    margin-bottom: 30px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+  }
+
+  .sr__label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .sr__input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--font);
+  }
+
+  .sr__input:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
+  .sr__hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 1em;
+  }
+
+  .blk {
+    margin-bottom: 30px;
+  }
+
+  .blk__h {
+    margin: 0 0 10px;
+    font-size: 17px;
+  }
+
+  .blk__tip {
+    margin: -4px 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .foot {
+    margin: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--hairline);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 760px) {
+    .stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .split {
+      grid-template-columns: 1fr;
+    }
+
+    .sc__title {
+      font-size: 22px;
+    }
+  }
+</style>
+
+<style is:global>
+  /* 搜索结果由 JS 创建，拿不到作用域标记，只能写全局 */
+  .sr__wrap {
+    margin-top: 12px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .sr__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 600px;
+  }
+
+  .sr__table th,
+  .sr__table td {
+    padding: 8px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--hairline);
+    text-align: left;
+  }
+
+  .sr__table th {
+    background: var(--thead-fill);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .sr__table .r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sr__table .code {
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+  }
+
+  .sr__table .up {
+    color: var(--up);
+  }
+
+  .sr__table .down {
+    color: var(--down);
+  }
+</style>
