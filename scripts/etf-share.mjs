@@ -966,15 +966,58 @@ async function fetchSinaClose(code, from, to) {
  * 判据：单日价格涨跌超过 40% 就是异常（正常 ETF 一天不可能），
  * 把跳变日连同前 3 个交易日一起标成「折算窗口」，窗口内的份额变化不计入。
  */
-function splitWindow(pxMap, dates) {
+/**
+ * 找出「份额折算/拆分」的日子。
+ *
+ * 判据的核心是**守恒**：拆分时份额增多、价格等比例下跌，两者相加约等于零。
+ * 只按「价格跳变超过 40%」抓会漏掉小幅拆分——159919 在 2019-01-11 按 1:1.11
+ * 拆分，份额 +11.07%、价格 -10.1%，看着都不夸张，但确实是拆分不是申购。
+ *
+ * 真实申购的特征是价格几乎不动、只有份额涨，不会满足「份额涨多少价格跌多少」。
+ */
+function splitWindow(pxMap, sharesOfCode, dates) {
   const bad = new Set();
+
+  // 先列出所有价格跳变点（只在有报价的日期之间比较，跳过停牌和周末）
+  const pxDates = dates.filter((d) => pxMap.get(d));
+  const jumps = [];
+  for (let j = 1; j < pxDates.length; j++) {
+    const p0 = pxMap.get(pxDates[j - 1]);
+    const p1 = pxMap.get(pxDates[j]);
+    const r = p1 / p0;
+    if (Math.abs(r - 1) > 0.04) jumps.push({ d: pxDates[j], r });
+  }
+  if (!jumps.length) return bad;
+
   for (let i = 1; i < dates.length; i++) {
-    const p0 = pxMap.get(dates[i - 1]);
-    const p1 = pxMap.get(dates[i]);
-    if (!p0 || !p1) continue;
-    if (Math.abs((p1 - p0) / p0) > 0.4) {
-      for (let k = Math.max(0, i - 3); k <= i; k++) bad.add(dates[k]);
+    const s0 = sharesOfCode.get(dates[i - 1]);
+    const s1 = sharesOfCode.get(dates[i]);
+    if (!s0 || !s1) continue;
+
+    const sRatio = s1 / s0;
+    // 份额一天变动不到 8% 的，基本不可能是折算，直接放过
+    if (Math.abs(sRatio - 1) < 0.08) continue;
+
+    /*
+     * 折算的判据是「份额比值 × 价格比值 ≈ 1」——拆分后份额变多少，
+     * 价格就反向变多少，市值守恒。真实申购会让市值实实在在变大，乘出来明显偏离 1。
+     *
+     * 两个坑：
+     *   1. 份额变化日和价格跳变日可能差 1~3 个交易日（510310 是 09-20 减半、
+     *      09-23 才跳价），必须跨日找匹配，不能只跟同一天比。
+     *   2. 用变化率相加在幅度大时会失真（份额减半是 -48.8%，价格翻倍是 +101%，
+     *      加起来对不上），用比值相乘才守恒。
+     */
+    const end = dates[Math.min(dates.length - 1, i + 3)];
+    let hit = false;
+    for (const jp of jumps) {
+      if (jp.d < dates[i] || jp.d > end) continue;
+      if (Math.abs(sRatio * jp.r - 1) < 0.05) {
+        hit = true;
+        break;
+      }
     }
+    if (hit) bad.add(dates[i]);
   }
   return bad;
 }
@@ -1125,7 +1168,9 @@ async function flowsFromExchange(bars, fromDate, toDate) {
 
   // 每只 ETF 的折算窗口
   const badByCode = new Map();
-  for (const code of inBasket) badByCode.set(code, splitWindow(px.get(code) || new Map(), dates));
+  for (const code of inBasket) {
+    badByCode.set(code, splitWindow(px.get(code) || new Map(), shares.get(code) || new Map(), dates));
+  }
   const splitCodes = [...badByCode].filter(([, s]) => s.size > 0).map(([c]) => c);
   if (splitCodes.length) console.log(`   ⚠ 检测到份额折算：${splitCodes.join(', ')}`);
 
