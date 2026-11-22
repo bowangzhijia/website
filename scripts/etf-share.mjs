@@ -946,7 +946,7 @@ async function fetchSinaClose(code, from, to) {
   const sym = `${code.startsWith('15') ? 'sz' : 'sh'}${code}`;
   const url =
     'https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData' +
-    `?symbol=${sym}&scale=240&ma=no&datalen=1023`;
+    `?symbol=${sym}&scale=240&ma=no&datalen=4000`; // 4000 够拿到 ETF 成立日
   const rows = await fetchJson(url, { 'User-Agent': UA, Referer: 'https://finance.sina.com.cn/' }, `新浪K线 ${code}`, 2);
   const out = new Map();
   for (const r of Array.isArray(rows) ? rows : []) {
@@ -1189,8 +1189,16 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
     baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
     aggregate,
   };
-  writeFileSync(histPath, JSON.stringify(out), 'utf8');
-  console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天）`);
+  const body = JSON.stringify(out);
+  writeFileSync(histPath, body, 'utf8');
+
+  // 再往 public 放一份给页面异步加载：11 年的 K 线直接内嵌进 HTML 有 500KB，
+  // 首屏会被拖慢，拆成独立文件让浏览器缓存更划算
+  const pubDir = join(ROOT, 'public', 'data', 'etf-share');
+  mkdirSync(pubDir, { recursive: true });
+  writeFileSync(join(pubDir, 'history.json'), body, 'utf8');
+
+  console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天，${Math.round(body.length / 1024)}KB）`);
 }
 
 // ============================================================

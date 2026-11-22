@@ -45,14 +45,6 @@ const baskets: any[] = data?.baskets ?? [];
   )
 }
 
-<script type="application/json" id="flow-data" is:inline set:html={JSON.stringify({
-    dates: data?.dates ?? [],
-    kline: data?.kline ?? [],
-    flowStart: data?.flowStart ?? 0,
-    baskets,
-    aggregate: data?.aggregate ?? [],
-  })}></script>
-
 <script>
   import * as echarts from 'echarts/core';
   import { CandlestickChart, BarChart } from 'echarts/charts';
@@ -74,11 +66,21 @@ const baskets: any[] = data?.baskets ?? [];
     CanvasRenderer,
   ]);
 
-  const el = document.getElementById('flow-data');
   const root = document.querySelector('[data-flowchart]') as HTMLElement | null;
 
-  if (el && root) {
-    const data = JSON.parse(el.textContent || '{}');
+  if (root) boot();
+
+  /** 数据是独立 JSON，异步加载——11 年 K 线内嵌进 HTML 会把首屏拖慢 */
+  async function boot() {
+    let data: any = null;
+    try {
+      const res = await fetch('/data/etf-share/history.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+    } catch (e) {
+      console.warn('history.json 加载失败', e);
+      return;
+    }
     const dates: string[] = data.dates || []; // 上证指数全历史
     const kline: any[] = data.kline || []; // [开,收,高,低]，和 dates 对齐
     const flowStart: number = Number(data.flowStart) || 0;
