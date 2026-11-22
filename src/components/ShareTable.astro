@@ -37,10 +37,10 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
   <table>
     <thead>
       <tr>
+        {hasPrice && <th class="r">净流入(亿元)</th>}
         <th>代码</th>
         <th>名称</th>
         <th class="r">规模(亿)</th>
-        {hasPrice && <th class="r">净流入(亿元)</th>}
         <th class="r">变化(亿份)</th>
         <th class="r">变化率</th>
         <th class="r">涨跌幅</th>
@@ -51,6 +51,9 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
       {
         rows.map((r) => (
           <tr>
+            {hasPrice && (
+              <td class={`r amt ${tone(r.amt)}`}>{sign(r.amt)}</td>
+            )}
             <td class="code">{r.c}</td>
             <td class="nm">
               {r.n}
@@ -58,7 +61,6 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
               {r.ni ? <span class="tag tag--new">新纳入</span> : null}
             </td>
             <td class="r dim">{r.sc != null ? r.sc.toFixed(1) : '—'}</td>
-            {hasPrice && <td class={`r ${tone(r.amt)}`}>{sign(r.amt)}</td>}
             <td class={`r ${tone(r.d)}`}>{sign(r.d)}</td>
             <td class={`r ${tone(r.p)}`}>{sign(r.p, 2, '%')}</td>
             <td class={`r ${tone(r.chg)}`}>{sign(r.chg, 2, '%')}</td>
@@ -126,6 +128,11 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
     max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* 第一列是排序依据，加粗一点更醒目 */
+  .amt {
+    font-weight: 700;
   }
 
   .up {
