@@ -42,8 +42,12 @@ const pool = rows.filter((r) => (r.sc ?? 0) >= MIN_SCALE);
 const poolChanged = pool.filter((r) => r.d !== 0).length;
 const changedCount = data?.changed ?? rows.filter((r) => r.d !== 0).length;
 
-const inflow = pool.filter((r) => r.d > 0).slice(0, 12);
-const outflow = [...pool].filter((r) => r.d < 0).sort((a, b) => a.d - b.d).slice(0, 12);
+// 按金额排，不按份数：不同 ETF 单价差十倍，按份数排会偏袒低价品种
+const byAmountDesc = (a: any, b: any) => (b.amt ?? -Infinity) - (a.amt ?? -Infinity);
+const byAmountAsc = (a: any, b: any) => (a.amt ?? Infinity) - (b.amt ?? Infinity);
+
+const inflow = pool.filter((r) => r.d > 0).sort(byAmountDesc).slice(0, 12);
+const outflow = pool.filter((r) => r.d < 0).sort(byAmountAsc).slice(0, 12);
 const upRedeem = pool
   .filter((r) => r.chg != null && r.chg > 0 && r.d < 0 && bigEnough(r))
   .sort((a, b) => (a.amt ?? a.d) - (b.amt ?? b.d))

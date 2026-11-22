@@ -561,8 +561,8 @@ const yi = (shares) => (shares / 1e8).toFixed(2);
 const pct = (v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 const money = (v) => (v == null ? '—' : (v / 1e8).toFixed(2));
 
-/** 名称截断，表格别被撑爆 */
-const shortName = (n) => (n.length > 10 ? n.slice(0, 10) + '…' : n);
+/** 名称截断，表格别被撑爆。名称现在是「沪深300ETF华泰柏瑞」这种长名，放宽到 14 字 */
+const shortName = (n) => (n.length > 14 ? n.slice(0, 14) + '…' : n);
 
 function yamlStr(text) {
   return '"' + String(text).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
@@ -597,8 +597,17 @@ function buildArticle(date, { prev, rows }, dates) {
   // 混进来会把真信号挤掉。门槛每天按最新规模重算，涨过就自动进、缩下去就自动出。
   const pool = rows.filter((r) => r.sc >= MIN_SCALE);
 
-  const inflow = pool.filter((r) => r.delta > 0).sort((a, b) => b.delta - a.delta);
-  const outflow = pool.filter((r) => r.delta < 0).sort((a, b) => a.delta - b.delta);
+  /**
+   * 按金额排，不按份数。
+   * 不同 ETF 单价能差十倍（黄金 7 块、半导体 1 块），按份数排会系统性偏袒低价品种：
+   * 恒生互联 +32.5 亿份只有 9 亿，中证500ETF +14.6 亿份却有 88 亿。
+   * 拿不到价格的排到最后，不参与金额比较。
+   */
+  const byAmountDesc = (a, b) => (b.amount ?? -Infinity) - (a.amount ?? -Infinity);
+  const byAmountAsc = (a, b) => (a.amount ?? Infinity) - (b.amount ?? Infinity);
+
+  const inflow = pool.filter((r) => r.delta > 0).sort(byAmountDesc);
+  const outflow = pool.filter((r) => r.delta < 0).sort(byAmountAsc);
 
   const upButRedeem = pool
     .filter((r) => r.chgPct != null && r.chgPct > 0 && r.delta < 0 && bigEnough(r))
