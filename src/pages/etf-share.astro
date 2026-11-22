@@ -28,20 +28,29 @@ if (existsSync(dataPath)) {
 const rows: any[] = data?.rows ?? [];
 const hasPrice = !!data?.hasPrice;
 
+/**
+ * 规模门槛（亿元），与 scripts/etf-share.mjs 的 MIN_SCALE 保持一致。
+ * 每天按最新规模重算，所以涨过 10 亿自动进来、缩下去自动退出。
+ */
+const MIN_SCALE = 10;
+
 /** 与脚本一致：反直觉榜要有绝对额门槛，否则全是小 ETF */
 const bigEnough = (r: any) => (r.amt != null ? Math.abs(r.amt) >= 5 : Math.abs(r.d) >= 1);
 
-const inflow = rows.filter((r) => r.d > 0).slice(0, 12);
-const outflow = [...rows].filter((r) => r.d < 0).sort((a, b) => a.d - b.d).slice(0, 12);
-const upRedeem = rows
+// 榜单只看 10 亿以上的；搜索仍然查全量
+const pool = rows.filter((r) => (r.sc ?? 0) >= MIN_SCALE);
+
+const inflow = pool.filter((r) => r.d > 0).slice(0, 12);
+const outflow = [...pool].filter((r) => r.d < 0).sort((a, b) => a.d - b.d).slice(0, 12);
+const upRedeem = pool
   .filter((r) => r.chg != null && r.chg > 0 && r.d < 0 && bigEnough(r))
   .sort((a, b) => (a.amt ?? a.d) - (b.amt ?? b.d))
   .slice(0, 10);
-const downBuy = rows
+const downBuy = pool
   .filter((r) => r.chg != null && r.chg < 0 && r.d > 0 && bigEnough(r))
   .sort((a, b) => (b.amt ?? b.d) - (a.amt ?? a.d))
   .slice(0, 10);
-const streak = rows
+const streak = pool
   .filter((r) => r.d > 0 && r.st >= 3)
   .sort((a, b) => b.st - a.st)
   .slice(0, 10);
@@ -156,6 +165,12 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
             </section>
           )}
 
+          <p class="scope">
+            榜单只收录规模 ≥ {MIN_SCALE} 亿的 <strong>{pool.length}</strong> 只（全市场今天有 {rows.length} 只出现份额变动）。
+            门槛每天按最新规模重算，涨过线自动纳入、缩下去自动剔除，不用维护名单。
+            份额由交易所次日披露，所以数据是 T+1 的，不存在盘中实时。
+          </p>
+
           {/* 搜索是全量 987 行，静态渲染太重，交给 JS 过滤 */}
           <div class="sr">
             <label class="sr__label" for="q">查单只</label>
@@ -173,8 +188,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                   <tr>
                     <th>代码</th>
                     <th>名称</th>
-                    <th class="r">份额(亿份)</th>
-                    <th class="r">变化</th>
+                    <th class="r">规模(亿)</th>
+                    <th class="r">变化(亿份)</th>
                     <th class="r">变化率</th>
                     <th class="r">涨跌幅</th>
                     {hasPrice && <th class="r">净流入(亿元)</th>}
@@ -256,7 +271,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
         const tr = document.createElement('tr');
         tr.innerHTML =
           `<td class="code">${r.c}</td><td>${r.n}</td>` +
-          `<td class="r">${r.s.toFixed(2)}</td>` +
+          `<td class="r dim">${r.sc != null ? r.sc.toFixed(1) : '—'}</td>` +
           `<td class="r ${tone(r.d)}">${sign(r.d)}</td>` +
           `<td class="r ${tone(r.p)}">${sign(r.p, '%')}</td>` +
           `<td class="r ${tone(r.chg)}">${sign(r.chg, '%')}</td>` +
@@ -503,6 +518,17 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     font-size: 13px;
     color: var(--muted);
     line-height: 1.7;
+  }
+
+  .scope {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border-left: 2px solid var(--accent);
+    background: var(--accent-tint);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text-dim);
   }
 
   .sr {

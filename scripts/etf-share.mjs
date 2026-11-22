@@ -416,6 +416,21 @@ const isBroad = (name) => BROAD_WORDS.some((k) => name.includes(k));
 const MIN_PREV_SHARE = 1e7; // 1000 万份
 
 /**
+ * 规模门槛（亿元）。低于这个数的不进榜单和文章。
+ *
+ * 依据：1699 只里有 822 只规模不到 2 亿，加起来只占全市场规模 1.4%、
+ * 占资金流向 0.5%，纯噪音。10 亿这条线砍掉 71% 的只数，只损失 1.9% 的流向。
+ *
+ * 这个门槛每天按最新规模重算，所以规模涨过 10 亿会自动进来，
+ * 缩到 10 亿以下会自动退出——不需要人工维护名单。
+ * 数据本身是 T+1 日频（份额要等交易所次日披露），不存在盘中实时。
+ */
+const MIN_SCALE = 10;
+
+/** 亿元规模 */
+const scaleOf = (share, close) => (share * (close || 0)) / 1e8;
+
+/**
  * 反直觉榜的绝对额门槛。
  * 只按变化率排会混进「-0.03 亿份、变化率 -8%」这种小 ETF，
  * 变化率吓人但金额可以忽略，读者看完没有信息量。
@@ -447,6 +462,9 @@ function computeChanges(date) {
     if (!p || !p.share || p.share < MIN_PREV_SHARE) continue;
     const delta = it.share - p.share;
     if (delta === 0) continue;
+    const sc = scaleOf(it.share, it.close);
+    const prevSc = scaleOf(p.share, p.close ?? it.close);
+
     rows.push({
       ...it,
       prevShare: p.share,
@@ -454,6 +472,9 @@ function computeChanges(date) {
       deltaPct: (delta / p.share) * 100,
       // 有价格才能折成金额，没有就记 null
       amount: it.close ? delta * it.close : null,
+      sc, // 当前规模(亿元)
+      // 昨天在门槛外、今天进来的，标出来——规模突然做大本身也是信号
+      newIn: sc >= MIN_SCALE && prevSc < MIN_SCALE ? 1 : 0,
     });
   }
   return { prev: prevDate, rows };
@@ -541,13 +562,14 @@ function yamlStr(text) {
 
 function table(rows, withAmount) {
   const head = withAmount
-    ? '| 代码 | 名称 | 份额变化(亿份) | 变化率 | 涨跌幅 | 估算净流入(亿元) |'
-    : '| 代码 | 名称 | 份额变化(亿份) | 变化率 | 涨跌幅 |';
-  const sep = withAmount ? '|---|---|---:|---:|---:|---:|' : '|---|---|---:|---:|---:|';
+    ? '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 | 估算净流入(亿元) |'
+    : '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 |';
+  const sep = withAmount ? '|---|---|---:|---:|---:|---:|---:|' : '|---|---|---:|---:|---:|---:|';
   const body = rows.map((r) => {
     const cells = [
       r.code,
-      shortName(r.name),
+      shortName(r.name) + (r.newIn ? '（新）' : ''),
+      r.sc != null ? r.sc.toFixed(1) : '—',
       `${r.delta > 0 ? '+' : ''}${yi(r.delta)}`,
       pct(r.deltaPct),
       r.chgPct == null ? '—' : pct(r.chgPct),
@@ -563,13 +585,17 @@ function buildArticle(date, { prev, rows }, dates) {
   const title = `${Number(month)}月${Number(day)}日 · ETF 份额异动`;
   const hasPrice = rows.some((r) => r.amount != null);
 
-  const inflow = rows.filter((r) => r.delta > 0).sort((a, b) => b.delta - a.delta);
-  const outflow = rows.filter((r) => r.delta < 0).sort((a, b) => a.delta - b.delta);
+  // 榜单只收规模 ≥10 亿的。小 ETF 几百万份的申赎就能做出 50% 变化率，
+  // 混进来会把真信号挤掉。门槛每天按最新规模重算，涨过就自动进、缩下去就自动出。
+  const pool = rows.filter((r) => r.sc >= MIN_SCALE);
 
-  const upButRedeem = rows
+  const inflow = pool.filter((r) => r.delta > 0).sort((a, b) => b.delta - a.delta);
+  const outflow = pool.filter((r) => r.delta < 0).sort((a, b) => a.delta - b.delta);
+
+  const upButRedeem = pool
     .filter((r) => r.chgPct != null && r.chgPct > 0 && r.delta < 0 && bigEnough(r))
     .sort((a, b) => (a.amount ?? a.delta) - (b.amount ?? b.delta));
-  const downButBuy = rows
+  const downButBuy = pool
     .filter((r) => r.chgPct != null && r.chgPct < 0 && r.delta > 0 && bigEnough(r))
     .sort((a, b) => (b.amount ?? b.delta) - (a.amount ?? a.delta));
 
@@ -599,8 +625,9 @@ function buildArticle(date, { prev, rows }, dates) {
   lines.push('## 一句话');
   lines.push('');
   lines.push(
-    `全市场 ${rows.length} 只有份额变动：**${inflow.length} 只净申购**、**${outflow.length} 只净赎回**` +
-      (hasPrice ? `，合计净流入 **${money(totalAmount)} 亿元**。` : '。')
+    `全市场 ${rows.length} 只有份额变动` +
+      (hasPrice ? `，合计净流入 **${money(totalAmount)} 亿元**` : '') +
+      `。规模 10 亿以上的 ${pool.length} 只里，**${inflow.length} 只净申购**、**${outflow.length} 只净赎回**。`
   );
 
   // 单日变动超过 30% 的，多半是大额申购或份额调整，值得单独点一句，
@@ -691,7 +718,7 @@ function buildArticle(date, { prev, rows }, dates) {
 
     // 篮子之外的全部算「其它」，不再用名称猜宽基（「300」里有纳斯达克、「50」里有中概互联）
     const inBasket = new Set(loadBaskets().flatMap((b) => b.codes));
-    const other = rows.filter((r) => !inBasket.has(r.code));
+    const other = pool.filter((r) => !inBasket.has(r.code));
     if (other.length) {
       const otherAmount = other.reduce((s, r) => s + (r.amount || 0), 0);
       const inAmount = baskets.reduce((s, b) => s + b.amount, 0);
@@ -721,6 +748,7 @@ function buildArticle(date, { prev, rows }, dates) {
 function writeLatest(date, { prev, rows }, dates) {
   const snap = loadSnapshot(date);
   const pyi = (v) => Math.round(v / 1e6) / 100; // 份 → 亿份，2 位小数
+  const inBasketCodes = new Set(loadBaskets().flatMap((b) => b.codes));
 
   const out = {
     date,
@@ -758,7 +786,9 @@ function writeLatest(date, { prev, rows }, dates) {
         px: r.close ?? null,
         chg: r.chgPct ?? null,
         amt: r.amount == null ? null : Math.round(r.amount / 1e6) / 100,
-        b: isBroad(r.name) ? 1 : 0,
+        sc: Math.round(r.sc * 100) / 100, // 规模(亿元)
+        b: inBasketCodes.has(r.code) ? 1 : 0,
+        ni: r.newIn || 0, // 今天刚够 10 亿门槛
         st: consecutiveDays(r.code, dates, r.delta > 0 ? 1 : -1),
       }))
       .sort((a, b) => b.d - a.d),

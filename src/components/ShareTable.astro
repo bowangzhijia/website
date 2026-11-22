@@ -14,7 +14,9 @@ interface Row {
   px: number | null; // 收盘价
   chg: number | null; // 涨跌幅 %
   amt: number | null; // 估算净流入(亿元)
-  b: number; // 是否宽基
+  sc: number; // 规模(亿元)
+  b: number; // 是否在宽基篮子里
+  ni: number; // 今天刚够 10 亿门槛
   st: number; // 连续同向天数
 }
 
@@ -37,8 +39,8 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
       <tr>
         <th>代码</th>
         <th>名称</th>
-        <th class="r">份额(亿份)</th>
-        <th class="r">变化</th>
+        <th class="r">规模(亿)</th>
+        <th class="r">变化(亿份)</th>
         <th class="r">变化率</th>
         <th class="r">涨跌幅</th>
         {hasPrice && <th class="r">净流入(亿元)</th>}
@@ -53,8 +55,9 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
             <td class="nm">
               {r.n}
               {r.b ? <span class="tag">宽基</span> : null}
+              {r.ni ? <span class="tag tag--new">新纳入</span> : null}
             </td>
-            <td class="r">{r.s.toFixed(2)}</td>
+            <td class="r dim">{r.sc != null ? r.sc.toFixed(1) : '—'}</td>
             <td class={`r ${tone(r.d)}`}>{sign(r.d)}</td>
             <td class={`r ${tone(r.p)}`}>{sign(r.p, 2, '%')}</td>
             <td class={`r ${tone(r.chg)}`}>{sign(r.chg, 2, '%')}</td>
@@ -145,5 +148,10 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
     border: 1px solid var(--border);
     color: var(--muted);
     font-size: 11px;
+  }
+
+  .tag--new {
+    border-color: var(--accent-border);
+    color: var(--accent);
   }
 </style>
