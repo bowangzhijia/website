@@ -483,19 +483,28 @@ function computeBaskets(date, rows) {
     let delta = 0;
     let amount = 0;
     let scale = 0;
-    let n = 0;
+    const members = [];
     for (const code of b.codes) {
       const it = byCode.get(code);
       if (!it) continue; // 已退市或还没上市，跳过
-      n++;
-      scale += it.share * (it.close || 0);
       const ch = changeByCode.get(code);
+      const mScale = (it.share * (it.close || 0)) / 1e8;
+      scale += mScale * 1e8;
       if (ch) {
         delta += ch.delta;
         amount += ch.amount || 0;
       }
+      // 成分逐只留痕，页面点开能看到是哪几只，方便自己核对
+      members.push({
+        c: code,
+        n: it.name,
+        s: mScale, // 规模(亿元)
+        d: ch ? ch.delta / 1e8 : 0, // 份额变化(亿份)
+        amt: ch && ch.amount != null ? ch.amount / 1e8 : 0, // 净流入(亿元)
+      });
     }
-    return { id: b.id, name: b.name, desc: b.desc || '', n, delta, amount, scale };
+    members.sort((x, y) => y.amt - x.amt || y.s - x.s);
+    return { id: b.id, name: b.name, desc: b.desc || '', n: members.length, delta, amount, scale, members };
   }).filter((b) => b.n > 0);
 }
 
@@ -730,6 +739,13 @@ function writeLatest(date, { prev, rows }, dates) {
       d: Math.round(b.delta / 1e6) / 100,
       amt: Math.round(b.amount / 1e6) / 100,
       s: Math.round(b.scale / 1e6) / 100,
+      members: b.members.map((m) => ({
+        c: m.c,
+        n: m.n,
+        s: Math.round(m.s * 100) / 100,
+        d: Math.round(m.d * 100) / 100,
+        amt: Math.round(m.amt * 100) / 100,
+      })),
     })),
     rows: rows
       .map((r) => ({

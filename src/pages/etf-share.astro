@@ -109,17 +109,44 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
               </div>
               <div class="bk__grid">
                 {baskets.map((b: any) => (
-                  <div class="bk__card" title={b.desc}>
-                    <div class="bk__name">
-                      {b.name}
-                      <span class="bk__n">{b.n} 只</span>
-                    </div>
-                    <div class={`bk__v ${b.amt >= 0 ? 'up' : 'down'}`}>
-                      {n2(b.amt)}
-                      <span class="bk__u">亿</span>
-                    </div>
-                    <div class="bk__scale">篮子规模 {Math.round(b.s)} 亿</div>
-                  </div>
+                  <details class="bk__card">
+                    <summary class="bk__sum">
+                      <div class="bk__name">
+                        {b.name}
+                        <span class="bk__n">{b.n} 只</span>
+                      </div>
+                      <div class={`bk__v ${b.amt >= 0 ? 'up' : 'down'}`}>
+                        {n2(b.amt)}
+                        <span class="bk__u">亿</span>
+                      </div>
+                      <div class="bk__scale">
+                        篮子规模 {Math.round(b.s)} 亿
+                        <span class="bk__more">点开看成分</span>
+                      </div>
+                    </summary>
+                    <table class="bk__tb">
+                      <thead>
+                        <tr>
+                          <th>代码</th>
+                          <th>名称</th>
+                          <th class="r">规模(亿元)</th>
+                          <th class="r">净流入(亿元)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(b.members || []).map((m: any) => (
+                          <tr>
+                            <td class="code">{m.c}</td>
+                            <td>{m.n}</td>
+                            <td class="r">{m.s.toFixed(2)}</td>
+                            <td class={`r ${m.amt > 0 ? 'up' : m.amt < 0 ? 'down' : 'dim'}`}>
+                              {m.amt === 0 ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
                 ))}
               </div>
               <p class="bk__foot">
@@ -314,6 +341,15 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     color: var(--muted);
   }
 
+  /* 红涨绿跌，跟国内看盘软件一致 */
+  .up {
+    color: var(--up);
+  }
+
+  .down {
+    color: var(--down);
+  }
+
   .split {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -365,6 +401,66 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card-bg);
+  }
+
+  /* 展开后占满整行，成分表才放得下 */
+  .bk__card[open] {
+    grid-column: 1 / -1;
+    border-color: var(--accent-border);
+  }
+
+  .bk__sum {
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .bk__sum::-webkit-details-marker {
+    display: none;
+  }
+
+  .bk__more {
+    margin-left: 8px;
+    color: var(--accent);
+  }
+
+  .bk__tb {
+    width: 100%;
+    margin-top: 12px;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .bk__tb th,
+  .bk__tb td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--hairline);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .bk__tb th {
+    background: var(--thead-fill);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .bk__tb tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .bk__tb .r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bk__tb .code {
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+  }
+
+  .bk__tb .dim {
+    color: var(--muted);
   }
 
   .bk__name {
