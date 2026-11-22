@@ -23,7 +23,8 @@ const baskets: any[] = data?.baskets ?? [];
       <div class="fc__head">
         <h2 class="fc__h">指数走势 vs 资金流</h2>
         <p class="fc__sub">
-          上面是 K 线，下面是同一指数下所有 ETF 加总的每日净流入（亿元）。指数和资金背离的时候最有意思。
+          上面是 K 线，下面是同一指数下所有 ETF 加总的<strong>每日净流入</strong>（亿元，柱子上标了数值）。
+          注意这不是指数成交额，是资金申购赎回的净额。指数在跌、柱子在往上，就是逆势买入。
         </p>
       </div>
 
@@ -92,26 +93,26 @@ const baskets: any[] = data?.baskets ?? [];
       const muted = css('--muted', '#6b7688');
       const line = css('--hairline', 'rgba(0,0,0,.08)');
 
-      const kMap = new Map<string, any>((it.k || []).map((x: any) => [x.d, x]));
+      // k 是和 dates 一一对应的 [开, 收, 高, 低]，缺的那天是 null
+      const ks: any[] = it.k || [];
       const basket = baskets.find((b) => b.id === it.basket);
       const flow: number[] = basket?.flow || [];
 
       const n = dates.length;
       const innerW = W - PAD_L - PAD_R;
       const step = innerW / Math.max(n, 1);
-      const bw = Math.max(2, Math.min(step * 0.62, 22));
+      const bw = Math.max(1.2, Math.min(step * 0.62, 20));
 
-      // K 线价格区间
-      const bars = dates.map((d) => kMap.get(d)).filter(Boolean) as any[];
-      if (!bars.length) {
-        svg.innerHTML = '';
-        return;
-      }
       let hi = -Infinity;
       let lo = Infinity;
-      for (const b of bars) {
-        hi = Math.max(hi, b.h);
-        lo = Math.min(lo, b.l);
+      for (const v of ks) {
+        if (!v) continue;
+        hi = Math.max(hi, v[2]);
+        lo = Math.min(lo, v[3]);
+      }
+      if (!Number.isFinite(hi)) {
+        svg.innerHTML = '';
+        return;
       }
       const pad = (hi - lo) * 0.06 || 1;
       hi += pad;
@@ -136,21 +137,18 @@ const baskets: any[] = data?.baskets ?? [];
 
       // 蜡烛
       dates.forEach((d, i) => {
-        const b = kMap.get(d);
-        if (!b) return;
+        const v = ks[i];
+        if (!v) return;
+        const [o, c, h, l] = v;
         const cx = PAD_L + step * i + step / 2;
-        const rising = b.c >= b.o;
+        const rising = c >= o;
         const color = rising ? up : down;
-        const yH = yOf(b.h);
-        const yL = yOf(b.l);
-        const yO = yOf(b.o);
-        const yC = yOf(b.c);
-        const top = Math.min(yO, yC);
-        const h = Math.max(Math.abs(yC - yO), 1.2);
+        const top = Math.min(yOf(o), yOf(c));
+        const bodyH = Math.max(Math.abs(yOf(c) - yOf(o)), 1.2);
         parts.push(
-          `<line x1="${cx}" y1="${yH}" x2="${cx}" y2="${yL}" stroke="${color}" stroke-width="1.2"/>` +
-            `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${h}" fill="${rising ? color : color}" rx="0.5"/>` +
-            `<title>${d} 开 ${b.o.toFixed(2)} 收 ${b.c.toFixed(2)} 高 ${b.h.toFixed(2)} 低 ${b.l.toFixed(2)}</title>`
+          `<line x1="${cx}" y1="${yOf(h)}" x2="${cx}" y2="${yOf(l)}" stroke="${color}" stroke-width="1"/>` +
+            `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${bodyH}" fill="${color}" rx="0.4"/>` +
+            `<title>${d} 开 ${o.toFixed(2)} 收 ${c.toFixed(2)} 高 ${h.toFixed(2)} 低 ${l.toFixed(2)}</title>`
         );
       });
 
@@ -160,6 +158,7 @@ const baskets: any[] = data?.baskets ?? [];
       );
 
       // 资金流柱
+      const showLabels = step >= 28; // 柱子够宽才标数字，否则糊成一片
       dates.forEach((d, i) => {
         const v = flow[i] ?? 0;
         if (!v) return;
@@ -172,6 +171,16 @@ const baskets: any[] = data?.baskets ?? [];
           }" opacity="0.85" rx="0.5"/>` +
             `<title>${d} 净流入 ${v > 0 ? '+' : ''}${v.toFixed(2)} 亿元</title>`
         );
+        // 最后一根一定标出来，其余看宽度
+        if (showLabels || i === n - 1) {
+          const label = `${v > 0 ? '+' : ''}${Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)}`;
+          const ty = v > 0 ? y - 4 : y + h + 11;
+          const anchor = i === n - 1 ? 'end' : 'middle';
+          const tx = Math.min(Math.max(cx, PAD_L + 12), W - PAD_R - 2);
+          parts.push(
+            `<text x="${tx}" y="${ty}" fill="${v > 0 ? up : down}" font-size="10" text-anchor="${anchor}">${label}</text>`
+          );
+        }
       });
 
       // 日期刻度：首、中、末
@@ -199,16 +208,19 @@ const baskets: any[] = data?.baskets ?? [];
 
       svg.innerHTML = parts.join('');
 
-      // 图例
+      // 图例：把「当天」的数值直接写出来，不用去数柱子
       const total = flows.reduce((s, v) => s + v, 0);
+      const last = flows[n - 1] ?? 0;
       const posDays = flows.filter((v) => v > 0).length;
       const negDays = flows.filter((v) => v < 0).length;
+      const sg = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
       legend.innerHTML =
-        `<span>区间净流入 <strong class="${total >= 0 ? 'up' : 'down'}">${total >= 0 ? '+' : ''}${total.toFixed(
+        `<span>当天（${dates[n - 1]}） <strong class="${last >= 0 ? 'up' : 'down'}">${sg(last)} 亿</strong></span>` +
+        `<span>区间累计 <strong class="${total >= 0 ? 'up' : 'down'}">${total >= 0 ? '+' : ''}${total.toFixed(
           1
         )} 亿</strong></span>` +
         `<span class="dim">${posDays} 天流入 / ${negDays} 天流出</span>` +
-        `<span class="dim">${dates[0]} ~ ${dates[dates.length - 1]}（${n} 个交易日）</span>`;
+        `<span class="dim">${dates[0]} ~ ${dates[n - 1]}（${n} 个交易日）</span>`;
 
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
     }

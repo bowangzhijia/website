@@ -861,76 +861,220 @@ const INDICES = [
   { code: '399006', name: '创业板指', secid: '0.399006', basket: 'cyb' },
 ];
 
-/** 日 K（前复权）。返回 [{d,o,c,h,l}] */
+/** 日 K（前复权）。days 传 'all' 就是全部历史。返回 [{d,o,c,h,l,a}] */
 async function fetchIndexKline(secid, days = 90) {
   const end = beijingToday().replace(/-/g, '');
-  const beg = shiftDate(beijingToday(), -days * 2).replace(/-/g, '');
+  const beg = days === 'all' ? '19910101' : shiftDate(beijingToday(), -Number(days) * 2).replace(/-/g, '');
   const url =
     'https://push2his.eastmoney.com/api/qt/stock/kline/get' +
     `?secid=${secid}&klt=101&fqt=1&beg=${beg}&end=${end}` +
     '&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57';
-  const j = await fetchJson(url, H_EM, `K线 ${secid}`, 2);
+  const j = await fetchJson(url, H_EM, `K线 ${secid}`, 3);
   return (j?.data?.klines || []).map((line) => {
-    const [d, o, c, h, l] = line.split(',');
-    return { d, o: +o, c: +c, h: +h, l: +l };
+    const [d, o, c, h, l, , a] = line.split(',');
+    return { d, o: +o, c: +c, h: +h, l: +l, a: Number(a) || 0 }; // a = 成交额(元)
   });
 }
 
 /**
- * 生成 history.json：指数 K 线 + 每个篮子的逐日净流入。
- * 图表直接读这个文件，构建时不用再算。
+ * 深市单只 ETF 的历史逐日份额。
+ *
+ * fund_jjgm 传代码 + 日期区间能一次拿多天，但区间超过约 170 自然日就返回空，
+ * 所以要分成 5 个月一个窗口。返回 Map<日期, 份额(份)>。
  */
-async function buildHistory() {
-  const dates = listSnapshots();
-  if (!dates.length) {
-    console.log('   没有快照，跳过历史数据');
-    return;
-  }
+async function fetchSzseHistory(code, start, end) {
+  const out = new Map();
+  let s = new Date(start + 'T00:00:00Z');
+  const finish = new Date(end + 'T00:00:00Z').getTime();
 
-  // 篮子逐日净流入 = Σ(份额变化 × 当日价)，单位亿元
-  const baskets = loadBaskets().map((b) => {
+  while (s.getTime() <= finish) {
+    const winEnd = new Date(Math.min(s.getTime() + 150 * 86400e3, finish));
+    const ds = s.toISOString().slice(0, 10);
+    const de = winEnd.toISOString().slice(0, 10);
+
+    for (let p = 1; p <= 12; p++) {
+      const url =
+        'https://fund.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=fund_jjgm' +
+        `&TABKEY=tab1&txtDm=${code}&txtStart=${ds}&txtEnd=${de}&PAGENO=${p}`;
+      const j = await fetchJson(url, H_SZSE_FUND, `深市历史 ${code} ${ds}`, 2);
+      const blk = j?.[0];
+      if (!blk) break;
+      for (const r of blk.data || []) {
+        const share = toShares(r.current_size);
+        if (r.size_date && share) out.set(r.size_date, share);
+      }
+      if (p >= Number(blk.metadata?.pagecount || 1)) break;
+      await sleep(120);
+    }
+    s = new Date(winEnd.getTime() + 86400e3);
+    await sleep(150);
+  }
+  return out;
+}
+
+/** 篮子逐日净流入 = Σ(份额变化 × 当日价)，单位亿元 */
+function flowOfDay(set, cur, prev) {
+  if (!prev || !cur) return 0;
+  const pm = new Map(prev.items.map((x) => [x.code, x]));
+  let amt = 0;
+  for (const it of cur.items) {
+    if (!set.has(it.code)) continue;
+    const p = pm.get(it.code);
+    if (!p || !p.share) continue;
+    amt += (it.share - p.share) * (it.close || p.close || 0);
+  }
+  return Math.round(amt / 1e6) / 100;
+}
+
+/** 从已有快照算（日常用，快） */
+function flowsFromSnapshots() {
+  const dates = listSnapshots();
+  const flows = {};
+  for (const b of loadBaskets()) {
     const set = new Set(b.codes);
     const flow = [];
     for (let i = 0; i < dates.length; i++) {
-      const cur = loadSnapshot(dates[i]);
-      const prev = i > 0 ? loadSnapshot(dates[i - 1]) : null;
-      if (!prev || !cur) {
-        flow.push(0);
-        continue;
-      }
-      const pm = new Map(prev.items.map((x) => [x.code, x]));
+      flow.push(flowOfDay(set, loadSnapshot(dates[i]), i > 0 ? loadSnapshot(dates[i - 1]) : null));
+    }
+    flows[b.id] = flow;
+  }
+  return { dates, flows };
+}
+
+/**
+ * 直接从交易所抓长期历史（一次性，慢）。
+ *
+ * 沪市接口只能按日期查全市场，所以是「一天一次请求」；
+ * 深市能按代码 + 区间查，所以按代码翻窗口就行。
+ * 只抓篮子里那几个代码，不抓全市场。
+ */
+async function flowsFromExchange(bars) {
+  const cal = await fetchIndexKline('1.000001', 'all');
+  if (!cal.length) throw new Error('拿不到交易日历');
+  const dates = cal.slice(-bars).map((x) => x.d);
+  const from = dates[0];
+  const to = dates[dates.length - 1];
+  console.log(`   抓 ${from} ~ ${to}，共 ${dates.length} 个交易日`);
+
+  const baskets = loadBaskets();
+  const inBasket = new Set(baskets.flatMap((b) => b.codes));
+  const szCodes = [...inBasket].filter((c) => c.startsWith('15'));
+
+  // code -> Map(date -> share)
+  const shares = new Map();
+  const put = (code, d, share) => {
+    if (!shares.has(code)) shares.set(code, new Map());
+    shares.get(code).set(d, share);
+  };
+
+  console.log('   沪市逐日抓取（只能按日期查）…');
+  for (let i = 0; i < dates.length; i++) {
+    const map = await fetchSse(dates[i]);
+    for (const [code, v] of map) if (inBasket.has(code)) put(code, dates[i], v.share);
+    if ((i + 1) % 40 === 0) console.log(`     沪市 ${i + 1}/${dates.length}`);
+    await sleep(200);
+  }
+
+  console.log(`   深市按代码抓取（${szCodes.length} 只）…`);
+  for (const code of szCodes) {
+    const m = await fetchSzseHistory(code, from, to);
+    for (const [d, s] of m) put(code, d, s);
+    await sleep(150);
+  }
+
+  console.log('   抓成分 ETF 的历史价格…');
+  const px = new Map();
+  for (const code of inBasket) {
+    const secid = `${code.startsWith('15') ? '0' : '1'}.${code}`;
+    const k = await fetchIndexKline(secid, bars * 2);
+    px.set(code, new Map(k.map((x) => [x.d, x.c])));
+    await sleep(100);
+  }
+
+  const flows = {};
+  for (const b of baskets) {
+    const flow = [0]; // 第一天没有前值
+    for (let i = 1; i < dates.length; i++) {
       let amt = 0;
-      for (const it of cur.items) {
-        if (!set.has(it.code)) continue;
-        const p = pm.get(it.code);
-        if (!p || !p.share) continue;
-        const price = it.close || p.close || 0;
-        amt += (it.share - p.share) * price;
+      for (const code of b.codes) {
+        const sm = shares.get(code);
+        if (!sm) continue;
+        const cur = sm.get(dates[i]);
+        const prev = sm.get(dates[i - 1]);
+        if (!cur || !prev) continue;
+        const pm = px.get(code);
+        amt += (cur - prev) * (pm?.get(dates[i]) || pm?.get(dates[i - 1]) || 0);
       }
       flow.push(Math.round(amt / 1e6) / 100);
     }
-    return { id: b.id, name: b.name, flow };
-  });
+    flows[b.id] = flow;
+  }
+  return { dates, flows };
+}
 
+/**
+ * 生成 history.json：指数 K 线 + 每个篮子的逐日净流入。
+ *
+ * deepBars > 1 时走交易所直接抓长期；否则从快照算。
+ * 两种模式结果会合并，避免日常运行把长期历史覆盖成最近 30 天。
+ */
+async function buildHistory(deepBars = 0) {
+  const histPath = join(DATA_DIR, 'history.json');
+  const old = existsSync(histPath) ? JSON.parse(readFileSync(histPath, 'utf8')) : null;
+
+  const got = deepBars > 1 ? await flowsFromExchange(deepBars) : flowsFromSnapshots();
+  let dates = got.dates;
+  let flows = got.flows;
+
+  if (!dates.length) {
+    console.log('   没有历史数据，跳过');
+    return;
+  }
+
+  // 合并旧数据：以并集为时间轴，新数据覆盖同一天
+  if (old?.dates?.length && old?.baskets?.length) {
+    const mergedDates = [...new Set([...old.dates, ...dates])].sort();
+    const mergedFlows = {};
+    for (const b of loadBaskets()) {
+      const oldB = old.baskets.find((x) => x.id === b.id);
+      const m = new Map();
+      if (oldB) old.dates.forEach((d, i) => m.set(d, oldB.flow[i]));
+      dates.forEach((d, i) => m.set(d, (flows[b.id] || [])[i] ?? 0));
+      mergedFlows[b.id] = mergedDates.map((d) => m.get(d) ?? 0);
+    }
+    dates = mergedDates;
+    flows = mergedFlows;
+  }
+
+  // 指数 K 线：按最终时间轴对齐，缺的那天留 null
   const indices = [];
   for (const idx of INDICES) {
-    const k = await fetchIndexKline(idx.secid);
+    const k = await fetchIndexKline(idx.secid, 'all');
     if (!k.length) {
       console.warn(`   ${idx.name} K 线没拿到，跳过`);
       continue;
     }
+    const km = new Map(k.map((x) => [x.d, x]));
     indices.push({
       code: idx.code,
       name: idx.name,
       basket: idx.basket,
-      // 只要快照覆盖到的区间，图才对得齐
-      k: k.filter((x) => x.d >= dates[0] && x.d <= dates[dates.length - 1]),
+      // [开, 收, 高, 低]，和 dates 一一对应
+      k: dates.map((d) => {
+        const x = km.get(d);
+        return x ? [x.o, x.c, x.h, x.l] : null;
+      }),
     });
-    await sleep(200);
+    await sleep(120);
   }
 
-  const out = { updated: new Date().toISOString(), dates, baskets, indices };
-  writeFileSync(join(DATA_DIR, 'history.json'), JSON.stringify(out), 'utf8');
+  const out = {
+    updated: new Date().toISOString(),
+    dates,
+    baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
+    indices,
+  };
+  writeFileSync(histPath, JSON.stringify(out), 'utf8');
   console.log(`   ✔ 已更新 history.json（${dates.length} 个交易日，${indices.length} 个指数）`);
 }
 
@@ -939,10 +1083,11 @@ async function buildHistory() {
 // ============================================================
 
 function parseArgs() {
-  const out = { date: null, days: 1, article: true, force: false };
+  const out = { date: null, days: 1, article: true, force: false, deep: 0 };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--date=')) out.date = a.slice(7);
     else if (a.startsWith('--days=')) out.days = Number(a.slice(7)) || 1;
+    else if (a.startsWith('--deep=')) out.deep = Number(a.slice(7)) || 0;
     else if (a === '--no-article') out.article = false;
     else if (a === '--force') out.force = true;
   }
@@ -957,6 +1102,12 @@ function articleDone(date) {
 async function main() {
   const args = parseArgs();
   const today = beijingToday();
+
+  // 只重建历史图表数据，不碰当日快照和文章
+  if (args.deep > 1) {
+    await buildHistory(args.deep);
+    return;
+  }
 
   if (args.days > 1) {
     // 回溯补历史：沪市便宜（一天一次），深市贵（一天 55 页）
