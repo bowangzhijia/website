@@ -570,7 +570,7 @@ function yamlStr(text) {
 
 function table(rows, withAmount) {
   const head = withAmount
-    ? '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 | 估算净流入(亿元) |'
+    ? '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 估算净流入(亿元) | 变化率 | 涨跌幅 |'
     : '| 代码 | 名称 | 规模(亿元) | 份额变化(亿份) | 变化率 | 涨跌幅 |';
   const sep = withAmount ? '|---|---|---:|---:|---:|---:|---:|' : '|---|---|---:|---:|---:|---:|';
   const body = rows.map((r) => {
@@ -579,10 +579,10 @@ function table(rows, withAmount) {
       shortName(r.name) + (r.newIn ? '（新）' : ''),
       r.sc != null ? r.sc.toFixed(1) : '—',
       `${r.delta > 0 ? '+' : ''}${yi(r.delta)}`,
-      pct(r.deltaPct),
-      r.chgPct == null ? '—' : pct(r.chgPct),
     ];
+    // 份和钱挨着放，方便互相对照
     if (withAmount) cells.push(money(r.amount));
+    cells.push(pct(r.deltaPct), r.chgPct == null ? '—' : pct(r.chgPct));
     return '| ' + cells.join(' | ') + ' |';
   });
   return [head, sep, ...body].join('\n');
