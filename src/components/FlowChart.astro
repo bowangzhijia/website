@@ -150,8 +150,13 @@ const baskets: any[] = data?.baskets ?? [];
                   `<br/>开 ${v[0].toFixed(2)}　收 <b style="color:${rising ? up : down}">${v[1].toFixed(2)}</b>` +
                   `<br/>高 ${v[2].toFixed(2)}　低 ${v[3].toFixed(2)}`;
               }
-              if (i >= flowStart) s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
-              else s += '<br/><span style="opacity:.6">这天还没有 ETF 份额数据</span>';
+              if (i < flowStart) {
+                s += '<br/><span style="opacity:.6">这天还没有 ETF 份额数据</span>';
+              } else if (f === 0) {
+                s += `<br/><span style="opacity:.6">这天数据缺失或份额无变化</span>`;
+              } else {
+                s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
+              }
               return s;
             },
           },

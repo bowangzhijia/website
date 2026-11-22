@@ -861,19 +861,81 @@ const INDICES = [
   { code: '399006', name: '创业板指', secid: '0.399006', basket: 'cyb' },
 ];
 
-/** 日 K（前复权）。days 传 'all' 就是全部历史。返回 [{d,o,c,h,l,a}] */
+/**
+ * 日 K（前复权）。days 传 'all' 就是全部历史。
+ *
+ * 一次要 30 多年（8000 多根）东财会直接掐连接（UND_ERR_SOCKET），
+ * 所以按十年一段拉，再拼起来。
+ */
 async function fetchIndexKline(secid, days = 90) {
-  const end = beijingToday().replace(/-/g, '');
-  const beg = days === 'all' ? '19910101' : shiftDate(beijingToday(), -Number(days) * 2).replace(/-/g, '');
-  const url =
-    'https://push2his.eastmoney.com/api/qt/stock/kline/get' +
-    `?secid=${secid}&klt=101&fqt=1&beg=${beg}&end=${end}` +
-    '&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57';
-  const j = await fetchJson(url, H_EM, `K线 ${secid}`, 3);
-  return (j?.data?.klines || []).map((line) => {
-    const [d, o, c, h, l, , a] = line.split(',');
-    return { d, o: +o, c: +c, h: +h, l: +l, a: Number(a) || 0 }; // a = 成交额(元)
-  });
+  const today = beijingToday().replace(/-/g, '');
+  const parse = (body) =>
+    (body?.data?.klines || []).map((line) => {
+      const [d, o, c, h, l, , a] = line.split(',');
+      return { d, o: +o, c: +c, h: +h, l: +l, a: Number(a) || 0 }; // a = 成交额(元)
+    });
+
+  const segs =
+    days === 'all'
+      ? [
+          ['19910101', '20001231'],
+          ['20010101', '20101231'],
+          ['20110101', '20201231'],
+          ['20210101', today],
+        ]
+      : [[shiftDate(beijingToday(), -Number(days) * 2).replace(/-/g, ''), today]];
+
+  const out = [];
+  for (const [beg, end] of segs) {
+    const url =
+      'https://push2his.eastmoney.com/api/qt/stock/kline/get' +
+      `?secid=${secid}&klt=101&fqt=1&beg=${beg}&end=${end}` +
+      '&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57';
+    const j = await fetchJson(url, H_EM, `K线 ${secid} ${beg}`, 3);
+    out.push(...parse(j));
+    if (segs.length > 1) await sleep(250);
+  }
+  return out;
+}
+
+const H_TX = { 'User-Agent': UA };
+
+/** 按年把区间切成若干段 */
+function splitYears(from, to, step = 3) {
+  const segs = [];
+  const endY = Number(to.slice(0, 4));
+  let y = Number(from.slice(0, 4));
+  while (y <= endY) {
+    segs.push([`${y}-01-01`, `${Math.min(y + step - 1, endY)}-12-31`]);
+    y += step;
+  }
+  return segs;
+}
+
+/**
+ * 单只 ETF 的历史收盘价，用腾讯行情。
+ *
+ * 为什么不用东财：push2his 对同一 IP 连续请求会直接掐连接（UND_ERR_SOCKET），
+ * 补历史时要抓几十只 ETF 的价格，用东财必然半路挂掉，价格拿不到净流入就全是 0。
+ * 腾讯单次上限约 800 条，三年一段正好。
+ */
+async function fetchTencentClose(code, from, to) {
+  const sym = `${code.startsWith('15') ? 'sz' : 'sh'}${code}`;
+  const out = new Map();
+  for (const [b, e] of splitYears(from, to)) {
+    const url =
+      'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get' +
+      `?param=${sym},day,${b},${e},900,qfq`;
+    const j = await fetchJson(url, H_TX, `腾讯K线 ${code} ${b}`, 2);
+    const d = j?.data?.[sym];
+    const k = d?.qfqday || d?.day || [];
+    for (const row of k) {
+      const close = Number(row[2]); // [日期, 开, 收, 高, 低, 量]
+      if (row[0] && Number.isFinite(close) && close > 0) out.set(row[0], close);
+    }
+    await sleep(120);
+  }
+  return out;
 }
 
 /**
@@ -948,10 +1010,26 @@ function flowsFromSnapshots() {
  * 深市能按代码 + 区间查，所以按代码翻窗口就行。
  * 只抓篮子里那几个代码，不抓全市场。
  */
-async function flowsFromExchange(bars) {
-  const cal = await fetchIndexKline('1.000001', 'all');
-  if (!cal.length) throw new Error('拿不到交易日历');
-  const dates = cal.slice(-bars).map((x) => x.d);
+async function flowsFromExchange(bars, fromDate, toDate) {
+  // 交易日历优先用已存的 K 线日期——东财偶尔会掐连接，没必要每次都去问
+  const histPath = join(DATA_DIR, 'history.json');
+  const cached = existsSync(histPath) ? JSON.parse(readFileSync(histPath, 'utf8')) : null;
+  let allDates = cached?.dates || [];
+  if (allDates.length < 100) {
+    const cal = await fetchIndexKline('1.000001', 'all');
+    allDates = cal.map((x) => x.d);
+  }
+  if (!allDates.length) throw new Error('拿不到交易日历');
+
+  // 支持两种模式：最近 N 个交易日，或指定区间（便于分段补历史，避免一次跑太久）
+  let dates;
+  if (fromDate) {
+    dates = allDates.filter((d) => d >= fromDate && (!toDate || d <= toDate));
+  } else {
+    dates = allDates.slice(-bars);
+  }
+  if (dates.length < 2) throw new Error(`区间内交易日太少：${dates.length}`);
+
   const from = dates[0];
   const to = dates[dates.length - 1];
   console.log(`   抓 ${from} ~ ${to}，共 ${dates.length} 个交易日`);
@@ -982,18 +1060,17 @@ async function flowsFromExchange(bars) {
     await sleep(150);
   }
 
-  console.log('   抓成分 ETF 的历史价格…');
+  console.log('   抓成分 ETF 的历史价格（腾讯）…');
   const px = new Map();
   for (const code of inBasket) {
-    const secid = `${code.startsWith('15') ? '0' : '1'}.${code}`;
-    const k = await fetchIndexKline(secid, bars * 2);
-    px.set(code, new Map(k.map((x) => [x.d, x.c])));
-    await sleep(100);
+    px.set(code, await fetchTencentClose(code, from, to));
+    await sleep(80);
   }
 
   const flows = {};
   for (const b of baskets) {
-    const flow = [0]; // 第一天没有前值
+    const flow = [];
+    // 从第 2 天开始：第一天没有前值，算不出变化
     for (let i = 1; i < dates.length; i++) {
       let amt = 0;
       for (const code of b.codes) {
@@ -1009,7 +1086,8 @@ async function flowsFromExchange(bars) {
     }
     flows[b.id] = flow;
   }
-  return { dates, flows };
+  // 时间轴也跟着去掉第一天，免得合并时把旧数据覆盖成 0
+  return { dates: dates.slice(1), flows };
 }
 
 /**
@@ -1018,11 +1096,12 @@ async function flowsFromExchange(bars) {
  * deepBars > 1 时走交易所直接抓长期；否则从快照算。
  * 两种模式结果会合并，避免日常运行把长期历史覆盖成最近 30 天。
  */
-async function buildHistory(deepBars = 0) {
+async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKline = false) {
   const histPath = join(DATA_DIR, 'history.json');
   const old = existsSync(histPath) ? JSON.parse(readFileSync(histPath, 'utf8')) : null;
 
-  const got = deepBars > 1 ? await flowsFromExchange(deepBars) : flowsFromSnapshots();
+  const got =
+    deepBars > 1 || fromDate ? await flowsFromExchange(deepBars, fromDate, toDate) : flowsFromSnapshots();
   let dates = got.dates;
   let flows = got.flows;
 
@@ -1049,11 +1128,21 @@ async function buildHistory(deepBars = 0) {
   }
 
   // K 线只用上证指数，拉成立以来全部（1990 至今 8000 多根）
-  const sh = await fetchIndexKline('1.000001', 'all');
-  if (!sh.length) {
-    console.warn('   上证指数 K 线没拿到，图表会空');
+  // 东财偶尔掐连接，抓不到就沿用上次存的，别让整次任务失败
+  const sh = skipKline ? [] : await fetchIndexKline('1.000001', 'all');
+  let klineDates;
+  let klineArr;
+  if (sh.length) {
+    klineDates = sh.map((x) => x.d);
+    klineArr = sh.map((x) => [x.o, x.c, x.h, x.l]);
+  } else if (old?.kline?.length && old?.dates?.length) {
+    console.warn('   K 线没抓到，沿用上次的');
+    klineDates = old.dates;
+    klineArr = old.kline;
+  } else {
+    klineDates = [];
+    klineArr = [];
   }
-  const klineDates = sh.map((x) => x.d);
 
   // 份额数据落在全历史时间轴的哪个位置（前面那段柱子是空的）
   let flowStart = klineDates.findIndex((d) => d >= dates[0]);
@@ -1069,7 +1158,7 @@ async function buildHistory(deepBars = 0) {
     dates: klineDates,
     flowDates: dates,
     flowStart,
-    kline: sh.map((x) => [x.o, x.c, x.h, x.l]),
+    kline: klineArr,
     // 篮子 flow 只存有份额的那一段，页面上按 flowStart 铺到全历史
     baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
     aggregate,
@@ -1088,8 +1177,11 @@ function parseArgs() {
     if (a.startsWith('--date=')) out.date = a.slice(7);
     else if (a.startsWith('--days=')) out.days = Number(a.slice(7)) || 1;
     else if (a.startsWith('--deep=')) out.deep = Number(a.slice(7)) || 0;
+    else if (a.startsWith('--from=')) out.from = a.slice(7);
+    else if (a.startsWith('--to=')) out.to = a.slice(5);
     else if (a === '--no-article') out.article = false;
     else if (a === '--force') out.force = true;
+    else if (a === '--no-kline') out.nokline = true;
   }
   return out;
 }
@@ -1104,8 +1196,9 @@ async function main() {
   const today = beijingToday();
 
   // 只重建历史图表数据，不碰当日快照和文章
-  if (args.deep > 1) {
-    await buildHistory(args.deep);
+  // 只重建历史图表数据，不碰当日快照和文章
+  if (args.deep > 1 || args.from) {
+    await buildHistory(args.deep, args.from || null, args.to || null, args.nokline);
     return;
   }
 
