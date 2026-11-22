@@ -1,0 +1,322 @@
+---
+/**
+ * 指数 K 线 + 篮子净流入柱状图。
+ *
+ * 上方 K 线是指数走势，下方柱状是同一指数下所有 ETF 加总的每日净流入。
+ * 一眼能看出「指数在跌、资金在买」这类背离。
+ *
+ * 纯手写 SVG，不引图表库：30 根蜡烛图加柱状，还不需要为一个页面拉进 1MB。
+ * 数据来自 src/data/etf-share/history.json，脚本每天生成。
+ */
+interface Props {
+  data: any;
+}
+
+const { data } = Astro.props;
+const indices = (data?.indices ?? []).filter((x: any) => x.k?.length);
+const baskets: any[] = data?.baskets ?? [];
+---
+
+{
+  indices.length > 0 && (
+    <section class="fc" data-flowchart>
+      <div class="fc__head">
+        <h2 class="fc__h">指数走势 vs 资金流</h2>
+        <p class="fc__sub">
+          上面是 K 线，下面是同一指数下所有 ETF 加总的每日净流入（亿元）。指数和资金背离的时候最有意思。
+        </p>
+      </div>
+
+      <div class="fc__tabs" role="tablist">
+        {indices.map((it: any, i: number) => (
+          <button class="fc__tab" type="button" data-idx={i} aria-pressed={i === 0 ? 'true' : 'false'}>
+            {it.name}
+          </button>
+        ))}
+      </div>
+
+      <div class="fc__legend" data-legend />
+
+      <div class="fc__canvas" data-canvas>
+        <svg
+          class="fc__svg"
+          viewBox="0 0 1000 400"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="指数 K 线与净流入柱状图"
+        />
+      </div>
+    </section>
+  )
+}
+
+<script type="application/json" id="flow-data" is:inline set:html={JSON.stringify({ dates: data?.dates ?? [], baskets, indices })}></script>
+
+<script>
+  const el = document.getElementById('flow-data');
+  const root = document.querySelector('[data-flowchart]') as HTMLElement | null;
+
+  if (el && root) {
+    const data = JSON.parse(el.textContent || '{}');
+    const dates: string[] = data.dates || [];
+    const baskets: any[] = data.baskets || [];
+    const indices: any[] = data.indices || [];
+    const canvas = root.querySelector('[data-canvas]') as HTMLElement;
+    const svg = root.querySelector('svg') as SVGSVGElement;
+    const legend = root.querySelector('[data-legend]') as HTMLElement;
+    const tabs = Array.from(root.querySelectorAll('[data-idx]')) as HTMLButtonElement[];
+
+    const css = (name: string, fallback: string) => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    };
+
+    // 图表尺寸（viewBox 坐标，实际宽高靠 CSS 缩放）
+    const W = 1000;
+    const PAD_L = 6;
+    const PAD_R = 6;
+    const TOP = 12;
+    const KH = 250; // K 线高度
+    const GAP = 18;
+    const BH = 96; // 柱状高度
+    const AXIS = 22; // 底部日期
+
+    const fmtDate = (d: string) => d.slice(5).replace('-', '/');
+
+    function draw(idxNo: number) {
+      const it = indices[idxNo];
+      if (!it) return;
+
+      const up = css('--up', '#d92d20');
+      const down = css('--down', '#128a4e');
+      const muted = css('--muted', '#6b7688');
+      const line = css('--hairline', 'rgba(0,0,0,.08)');
+
+      const kMap = new Map<string, any>((it.k || []).map((x: any) => [x.d, x]));
+      const basket = baskets.find((b) => b.id === it.basket);
+      const flow: number[] = basket?.flow || [];
+
+      const n = dates.length;
+      const innerW = W - PAD_L - PAD_R;
+      const step = innerW / Math.max(n, 1);
+      const bw = Math.max(2, Math.min(step * 0.62, 22));
+
+      // K 线价格区间
+      const bars = dates.map((d) => kMap.get(d)).filter(Boolean) as any[];
+      if (!bars.length) {
+        svg.innerHTML = '';
+        return;
+      }
+      let hi = -Infinity;
+      let lo = Infinity;
+      for (const b of bars) {
+        hi = Math.max(hi, b.h);
+        lo = Math.min(lo, b.l);
+      }
+      const pad = (hi - lo) * 0.06 || 1;
+      hi += pad;
+      lo -= pad;
+      const yOf = (p: number) => TOP + ((hi - p) / (hi - lo)) * KH;
+
+      // 柱状：零轴按正负最大值分配
+      const flows = dates.map((_, i) => flow[i] ?? 0);
+      const maxPos = Math.max(0, ...flows);
+      const maxNeg = Math.max(0, ...flows.map((v) => -v));
+      const span = maxPos + maxNeg || 1;
+      const zeroY = TOP + KH + GAP + (maxPos / span) * BH;
+      const flowScale = (BH / span) * 0.92;
+
+      const parts: string[] = [];
+
+      // K 线区背景网格：3 条
+      for (let g = 0; g <= 3; g++) {
+        const y = TOP + (KH / 3) * g;
+        parts.push(`<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="${line}" stroke-width="1"/>`);
+      }
+
+      // 蜡烛
+      dates.forEach((d, i) => {
+        const b = kMap.get(d);
+        if (!b) return;
+        const cx = PAD_L + step * i + step / 2;
+        const rising = b.c >= b.o;
+        const color = rising ? up : down;
+        const yH = yOf(b.h);
+        const yL = yOf(b.l);
+        const yO = yOf(b.o);
+        const yC = yOf(b.c);
+        const top = Math.min(yO, yC);
+        const h = Math.max(Math.abs(yC - yO), 1.2);
+        parts.push(
+          `<line x1="${cx}" y1="${yH}" x2="${cx}" y2="${yL}" stroke="${color}" stroke-width="1.2"/>` +
+            `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${h}" fill="${rising ? color : color}" rx="0.5"/>` +
+            `<title>${d} 开 ${b.o.toFixed(2)} 收 ${b.c.toFixed(2)} 高 ${b.h.toFixed(2)} 低 ${b.l.toFixed(2)}</title>`
+        );
+      });
+
+      // 零轴
+      parts.push(
+        `<line x1="${PAD_L}" y1="${zeroY}" x2="${W - PAD_R}" y2="${zeroY}" stroke="${muted}" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>`
+      );
+
+      // 资金流柱
+      dates.forEach((d, i) => {
+        const v = flow[i] ?? 0;
+        if (!v) return;
+        const cx = PAD_L + step * i + step / 2;
+        const h = Math.abs(v) * flowScale;
+        const y = v > 0 ? zeroY - h : zeroY;
+        parts.push(
+          `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(h, 1)}" fill="${
+            v > 0 ? up : down
+          }" opacity="0.85" rx="0.5"/>` +
+            `<title>${d} 净流入 ${v > 0 ? '+' : ''}${v.toFixed(2)} 亿元</title>`
+        );
+      });
+
+      // 日期刻度：首、中、末
+      const marks = [0, Math.floor((n - 1) / 2), n - 1];
+      for (const i of marks) {
+        if (!dates[i]) continue;
+        const cx = PAD_L + step * i + step / 2;
+        const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
+        parts.push(
+          `<text x="${cx}" y="${TOP + KH + GAP + BH + 16}" fill="${muted}" font-size="12" text-anchor="${anchor}">${fmtDate(dates[i])}</text>`
+        );
+      }
+
+      // 右上角价格区间
+      parts.push(
+        `<text x="${W - PAD_R}" y="${TOP + 12}" fill="${muted}" font-size="12" text-anchor="end">${hi.toFixed(
+          0
+        )} / ${lo.toFixed(0)}</text>`
+      );
+
+      // 零轴标注
+      parts.push(
+        `<text x="${PAD_L}" y="${zeroY - 4}" fill="${muted}" font-size="11">0 亿</text>`
+      );
+
+      svg.innerHTML = parts.join('');
+
+      // 图例
+      const total = flows.reduce((s, v) => s + v, 0);
+      const posDays = flows.filter((v) => v > 0).length;
+      const negDays = flows.filter((v) => v < 0).length;
+      legend.innerHTML =
+        `<span>区间净流入 <strong class="${total >= 0 ? 'up' : 'down'}">${total >= 0 ? '+' : ''}${total.toFixed(
+          1
+        )} 亿</strong></span>` +
+        `<span class="dim">${posDays} 天流入 / ${negDays} 天流出</span>` +
+        `<span class="dim">${dates[0]} ~ ${dates[dates.length - 1]}（${n} 个交易日）</span>`;
+
+      tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
+    }
+
+    tabs.forEach((t) => {
+      t.addEventListener('click', () => draw(Number(t.dataset.idx)));
+    });
+
+    draw(0);
+
+    // 主题切换后重画，否则颜色还停留在旧主题
+    new MutationObserver(() => draw(Number(root.querySelector('[aria-pressed="true"]')?.getAttribute('data-idx') || 0)))
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+  }
+</script>
+
+<style>
+  .fc {
+    margin-bottom: 28px;
+  }
+
+  .fc__head {
+    margin-bottom: 12px;
+  }
+
+  .fc__h {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+
+  .fc__sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .fc__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .fc__tab {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--chip-fill);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.16s ease;
+  }
+
+  .fc__tab:hover {
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+
+  .fc__tab[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
+
+  .fc__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .fc__legend .dim {
+    color: var(--muted);
+  }
+
+  .fc__canvas {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 4px;
+  }
+
+  .fc__svg {
+    display: block;
+    width: 100%;
+    height: 300px;
+  }
+
+  @media (max-width: 760px) {
+    .fc__svg {
+      height: 240px;
+    }
+  }
+</style>
+
+<style is:global>
+  /* 图例是 JS 生成的，拿不到作用域标记 */
+  .fc__legend .up {
+    color: var(--up);
+  }
+
+  .fc__legend .down {
+    color: var(--down);
+  }
+</style>

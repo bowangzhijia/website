@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ShareTable from '../components/ShareTable.astro';
+import FlowChart from '../components/FlowChart.astro';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -15,6 +16,7 @@ import { join } from 'node:path';
  */
 
 const dataPath = join(process.cwd(), 'src', 'data', 'etf-share', 'latest.json');
+const histPath = join(process.cwd(), 'src', 'data', 'etf-share', 'history.json');
 
 let data: any = null;
 if (existsSync(dataPath)) {
@@ -22,6 +24,15 @@ if (existsSync(dataPath)) {
     data = JSON.parse(readFileSync(dataPath, 'utf8'));
   } catch {
     data = null;
+  }
+}
+
+let history: any = null;
+if (existsSync(histPath)) {
+  try {
+    history = JSON.parse(readFileSync(histPath, 'utf8'));
+  } catch {
+    history = null;
   }
 }
 
@@ -113,6 +124,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
               <span class="stat__u">只 ETF</span>
             </div>
           </div>
+
+          {history && <FlowChart data={history} />}
 
           {baskets.length > 0 && (
             <section class="bk">

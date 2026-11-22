@@ -844,6 +844,97 @@ function generateArticle(date) {
 }
 
 // ============================================================
+//  历史走势（指数 K 线 + 篮子逐日净流入）
+// ============================================================
+
+/**
+ * 要画的指数。secid 规则：沪市 1.xxxxxx，深市 0.xxxxxx。
+ * 这几个正好和 baskets.json 里的篮子一一对应。
+ */
+const INDICES = [
+  { code: '000300', name: '沪深300', secid: '1.000300', basket: 'hs300' },
+  { code: '000001', name: '上证指数', secid: '1.000001', basket: null },
+  { code: '000016', name: '上证50', secid: '1.000016', basket: 'sz50' },
+  { code: '000905', name: '中证500', secid: '1.000905', basket: 'zz500' },
+  { code: '000852', name: '中证1000', secid: '1.000852', basket: 'zz1000' },
+  { code: '000688', name: '科创50', secid: '1.000688', basket: 'kc50' },
+  { code: '399006', name: '创业板指', secid: '0.399006', basket: 'cyb' },
+];
+
+/** 日 K（前复权）。返回 [{d,o,c,h,l}] */
+async function fetchIndexKline(secid, days = 90) {
+  const end = beijingToday().replace(/-/g, '');
+  const beg = shiftDate(beijingToday(), -days * 2).replace(/-/g, '');
+  const url =
+    'https://push2his.eastmoney.com/api/qt/stock/kline/get' +
+    `?secid=${secid}&klt=101&fqt=1&beg=${beg}&end=${end}` +
+    '&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57';
+  const j = await fetchJson(url, H_EM, `K线 ${secid}`, 2);
+  return (j?.data?.klines || []).map((line) => {
+    const [d, o, c, h, l] = line.split(',');
+    return { d, o: +o, c: +c, h: +h, l: +l };
+  });
+}
+
+/**
+ * 生成 history.json：指数 K 线 + 每个篮子的逐日净流入。
+ * 图表直接读这个文件，构建时不用再算。
+ */
+async function buildHistory() {
+  const dates = listSnapshots();
+  if (!dates.length) {
+    console.log('   没有快照，跳过历史数据');
+    return;
+  }
+
+  // 篮子逐日净流入 = Σ(份额变化 × 当日价)，单位亿元
+  const baskets = loadBaskets().map((b) => {
+    const set = new Set(b.codes);
+    const flow = [];
+    for (let i = 0; i < dates.length; i++) {
+      const cur = loadSnapshot(dates[i]);
+      const prev = i > 0 ? loadSnapshot(dates[i - 1]) : null;
+      if (!prev || !cur) {
+        flow.push(0);
+        continue;
+      }
+      const pm = new Map(prev.items.map((x) => [x.code, x]));
+      let amt = 0;
+      for (const it of cur.items) {
+        if (!set.has(it.code)) continue;
+        const p = pm.get(it.code);
+        if (!p || !p.share) continue;
+        const price = it.close || p.close || 0;
+        amt += (it.share - p.share) * price;
+      }
+      flow.push(Math.round(amt / 1e6) / 100);
+    }
+    return { id: b.id, name: b.name, flow };
+  });
+
+  const indices = [];
+  for (const idx of INDICES) {
+    const k = await fetchIndexKline(idx.secid);
+    if (!k.length) {
+      console.warn(`   ${idx.name} K 线没拿到，跳过`);
+      continue;
+    }
+    indices.push({
+      code: idx.code,
+      name: idx.name,
+      basket: idx.basket,
+      // 只要快照覆盖到的区间，图才对得齐
+      k: k.filter((x) => x.d >= dates[0] && x.d <= dates[dates.length - 1]),
+    });
+    await sleep(200);
+  }
+
+  const out = { updated: new Date().toISOString(), dates, baskets, indices };
+  writeFileSync(join(DATA_DIR, 'history.json'), JSON.stringify(out), 'utf8');
+  console.log(`   ✔ 已更新 history.json（${dates.length} 个交易日，${indices.length} 个指数）`);
+}
+
+// ============================================================
 //  入口
 // ============================================================
 
@@ -881,6 +972,7 @@ async function main() {
       await collectDay(d);
       await sleep(1000);
     }
+    await buildHistory();
     return;
   }
 
@@ -897,6 +989,7 @@ async function main() {
       return;
     }
     if (args.article) generateArticle(target);
+    await buildHistory();
     return;
   }
 
@@ -906,11 +999,13 @@ async function main() {
     // 这一天的文章已经有了，说明当天已经成功跑过一次，后面几个时段不用再抓
     if (args.article && articleDone(d) && !args.force) {
       console.log(`${d} 的文章已存在，本次跳过`);
+      await buildHistory();
       return;
     }
     const snap = await collectDay(d);
     if (snap) {
       if (args.article) generateArticle(d);
+      await buildHistory();
       return;
     }
     await sleep(1000);
