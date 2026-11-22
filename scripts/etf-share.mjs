@@ -956,12 +956,42 @@ async function fetchSinaClose(code, from, to) {
   return out;
 }
 
-/** 收盘价：腾讯优先，拿不到换新浪 */
+/**
+ * 找出「份额折算/拆分」的日子。
+ *
+ * ETF 做份额折算时，份额一夜之间减半、价格同时翻倍（比如 510310 在 2024-09-20
+ * 份额 -48.84%，09-23 价格从 1.599 跳到 3.213）。如果直接按「份额变化 × 价格」
+ * 算净流入，会得出一千多亿的假赎回，把整张图毁掉。
+ *
+ * 判据：单日价格涨跌超过 40% 就是异常（正常 ETF 一天不可能），
+ * 把跳变日连同前 3 个交易日一起标成「折算窗口」，窗口内的份额变化不计入。
+ */
+function splitWindow(pxMap, dates) {
+  const bad = new Set();
+  for (let i = 1; i < dates.length; i++) {
+    const p0 = pxMap.get(dates[i - 1]);
+    const p1 = pxMap.get(dates[i]);
+    if (!p0 || !p1) continue;
+    if (Math.abs((p1 - p0) / p0) > 0.4) {
+      for (let k = Math.max(0, i - 3); k <= i; k++) bad.add(dates[k]);
+    }
+  }
+  return bad;
+}
+
+/**
+ * 收盘价：新浪优先，拿不到才用腾讯。
+ *
+ * 顺序不能反。腾讯那个接口返回的是**前复权**价，折算过的 ETF 历史价格被
+ * 悄悄除过权，价格序列是连续的，根本看不出哪天做过份额折算；而且用复权价
+ * 去乘「未复权的份额变化」，折算前的金额会系统性偏小。
+ * 新浪返回的是不复权价，折算那天价格会跳变，正好拿来识别折算。
+ */
 async function fetchEtfClose(code, from, to) {
-  const tx = await fetchTencentClose(code, from, to);
-  if (tx.size > 0) return tx;
-  console.warn(`   腾讯拿不到 ${code} 的价格，换新浪`);
-  return fetchSinaClose(code, from, to);
+  const sina = await fetchSinaClose(code, from, to);
+  if (sina.size > 0) return sina;
+  console.warn(`   新浪拿不到 ${code} 的价格，换腾讯（价格是复权的，折算日可能不准）`);
+  return fetchTencentClose(code, from, to);
 }
 
 /**
@@ -1093,7 +1123,14 @@ async function flowsFromExchange(bars, fromDate, toDate) {
     await sleep(80);
   }
 
+  // 每只 ETF 的折算窗口
+  const badByCode = new Map();
+  for (const code of inBasket) badByCode.set(code, splitWindow(px.get(code) || new Map(), dates));
+  const splitCodes = [...badByCode].filter(([, s]) => s.size > 0).map(([c]) => c);
+  if (splitCodes.length) console.log(`   ⚠ 检测到份额折算：${splitCodes.join(', ')}`);
+
   const flows = {};
+  let skipped = 0;
   for (const b of baskets) {
     const flow = [];
     // 从第 2 天开始：第一天没有前值，算不出变化
@@ -1102,6 +1139,11 @@ async function flowsFromExchange(bars, fromDate, toDate) {
       for (const code of b.codes) {
         const sm = shares.get(code);
         if (!sm) continue;
+        // 折算窗口内的份额变化不是申赎，跳过
+        if (badByCode.get(code)?.has(dates[i])) {
+          skipped++;
+          continue;
+        }
         const cur = sm.get(dates[i]);
         const prev = sm.get(dates[i - 1]);
         if (!cur || !prev) continue;
@@ -1112,6 +1154,7 @@ async function flowsFromExchange(bars, fromDate, toDate) {
     }
     flows[b.id] = flow;
   }
+  if (skipped) console.log(`   因折算跳过 ${skipped} 条记录`);
   // 时间轴也跟着去掉第一天，免得合并时把旧数据覆盖成 0
   return { dates: dates.slice(1), flows };
 }
