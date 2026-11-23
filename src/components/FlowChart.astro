@@ -23,8 +23,8 @@ const baskets: any[] = data?.baskets ?? [];
       <div class="fc__head">
         <h2 class="fc__h">上证指数 vs 宽基资金流</h2>
         <p class="fc__sub">
-          上面是<strong>上证指数</strong> K 线（成立以来全部），下面是所选宽基的<strong>资金净流入</strong>（亿元，不是成交额）。
-          柱子只有最近一年——ETF 份额是近年才有的数据。底部滑块拖动看历史，滚轮缩放。
+          上面是<strong>上证指数</strong> K 线（成立以来全部，可切日/周/月/季/年），下面是所选宽基的<strong>资金净流入</strong>（亿元，不是成交额）。
+          柱子只有 2016 年之后——ETF 份额是近年才有的数据。底部滑块拖动看历史，滚轮缩放。
         </p>
       </div>
 
@@ -34,6 +34,22 @@ const baskets: any[] = data?.baskets ?? [];
             {b.name}
           </button>
         ))}
+      </div>
+
+      <div class="fc__periods" role="group" aria-label="K线周期">
+        {
+          [
+            ['d', '日K'],
+            ['w', '周K'],
+            ['m', '月K'],
+            ['q', '季K'],
+            ['y', '年K'],
+          ].map(([k, lab], i) => (
+            <button class="fc__period" type="button" data-period={k} aria-pressed={i === 0 ? 'true' : 'false'}>
+              {lab}
+            </button>
+          ))
+        }
       </div>
 
       <div class="fc__legend" data-legend />
@@ -121,7 +137,56 @@ const baskets: any[] = data?.baskets ?? [];
     const sig = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(2);
     let chart: any = null;
     let current = 0;
+    let period = 'd'; // d 日 / w 周 / m 月 / q 季 / y 年
+    let lastPeriod = '';
     let zoom = { start: 92, end: 100 };
+
+    /** 周期分组键：同一周期的交易日归到一组 */
+    function periodKey(d: string, p: string) {
+      if (p === 'd') return d;
+      const dt = new Date(d + 'T00:00:00Z');
+      const y = dt.getUTCFullYear();
+      const m = dt.getUTCMonth();
+      if (p === 'w') {
+        // 用周四当周标识，跨年也稳定
+        const wd = dt.getUTCDay() || 7;
+        return new Date(dt.getTime() + (4 - wd) * 86400000).toISOString().slice(0, 10);
+      }
+      if (p === 'm') return `${y}-${String(m + 1).padStart(2, '0')}`;
+      if (p === 'q') return `${y}-Q${Math.floor(m / 3) + 1}`;
+      return String(y);
+    }
+
+    /**
+     * 把日线聚合成周/月/季/年线，资金流同期累加。
+     * 开＝该周期第一天的开盘，收＝最后一天收盘，高低取区间极值。
+     * 标签统一用该周期最后一个交易日，和看盘软件一致。
+     */
+    function group(flow: number[]) {
+      const bars: any[] = [];
+      let cur: any = null;
+      let lastKey = '';
+      for (let i = 0; i < n; i++) {
+        const key = periodKey(dates[i], period);
+        if (key !== lastKey) {
+          if (cur) bars.push(cur);
+          cur = { label: dates[i], o: null, c: null, h: null, l: null, flow: 0, hasFlow: false };
+          lastKey = key;
+        }
+        const v = kline[i];
+        if (v) {
+          if (cur.o == null) cur.o = v[0];
+          cur.c = v[1];
+          cur.h = cur.h == null ? v[2] : Math.max(cur.h, v[2]);
+          cur.l = cur.l == null ? v[3] : Math.min(cur.l, v[3]);
+        }
+        cur.flow += flow[i] || 0;
+        if (i >= flowStart) cur.hasFlow = true;
+        cur.label = dates[i];
+      }
+      if (cur) bars.push(cur);
+      return bars;
+    }
 
     function render(idxNo: number) {
       current = idxNo;
@@ -135,8 +200,17 @@ const baskets: any[] = data?.baskets ?? [];
       const flow = fulls[idxNo] ?? aggFull;
       const label = basket ? `${basket.name} 篮子` : '六大宽基合计';
 
-      // candlestick 要 [开, 收, 低, 高]，数据存的是 [开, 收, 高, 低]
-      const ohlc = kline.map((v: any) => (v ? [v[0], v[1], v[3], v[2]] : '-'));
+      const bars = group(flow);
+      const labels = bars.map((b) => b.label);
+      // candlestick 要 [开, 收, 低, 高]，日线存的是 [开, 收, 高, 低]
+      const ohlc = bars.map((b) => (b.o == null ? '-' : [b.o, b.c, b.l, b.h]));
+
+      // 切换周期时重置可视范围：默认看到最近 140 根
+      if (lastPeriod !== period) {
+        lastPeriod = period;
+        const span = Math.min(140, bars.length);
+        zoom = { start: Math.max(0, 100 - (span / Math.max(bars.length, 1)) * 100), end: 100 };
+      }
 
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
 
@@ -153,19 +227,20 @@ const baskets: any[] = data?.baskets ?? [];
             textStyle: { color: text, fontSize: 12 },
             formatter: (ps: any[]) => {
               const i = ps[0]?.dataIndex ?? 0;
-              const v = kline[i];
-              const f = flow[i] ?? 0;
-              let s = `<b>${dates[i]}</b>`;
-              if (v) {
-                const rising = v[1] >= v[0];
+              const b = bars[i];
+              if (!b) return '';
+              const f = b.flow;
+              let s = `<b>${b.label}</b>`;
+              if (b.o != null) {
+                const rising = b.c >= b.o;
                 s +=
-                  `<br/>开 ${v[0].toFixed(2)}　收 <b style="color:${rising ? up : down}">${v[1].toFixed(2)}</b>` +
-                  `<br/>高 ${v[2].toFixed(2)}　低 ${v[3].toFixed(2)}`;
+                  `<br/>开 ${b.o.toFixed(2)}　收 <b style="color:${rising ? up : down}">${b.c.toFixed(2)}</b>` +
+                  `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
               }
-              if (i < flowStart) {
-                s += '<br/><span style="opacity:.6">这天还没有 ETF 份额数据</span>';
+              if (!b.hasFlow) {
+                s += '<br/><span style="opacity:.6">这段还没有 ETF 份额数据</span>';
               } else if (f === 0) {
-                s += `<br/><span style="opacity:.6">这天数据缺失或份额无变化</span>`;
+                s += `<br/><span style="opacity:.6">本期数据缺失或份额无变化</span>`;
               } else {
                 s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
               }
@@ -179,7 +254,7 @@ const baskets: any[] = data?.baskets ?? [];
           xAxis: [
             {
               type: 'category',
-              data: dates,
+              data: labels,
               gridIndex: 0,
               boundaryGap: true,
               axisLine: { lineStyle: { color: line } },
@@ -188,7 +263,7 @@ const baskets: any[] = data?.baskets ?? [];
             },
             {
               type: 'category',
-              data: dates,
+              data: labels,
               gridIndex: 1,
               boundaryGap: true,
               axisLine: { lineStyle: { color: line } },
@@ -245,9 +320,9 @@ const baskets: any[] = data?.baskets ?? [];
               type: 'bar',
               xAxisIndex: 1,
               yAxisIndex: 1,
-              data: flow.map((v: number) => ({
-                value: v,
-                itemStyle: { color: v >= 0 ? up : down, opacity: 0.8 },
+              data: bars.map((b) => ({
+                value: b.flow,
+                itemStyle: { color: b.flow >= 0 ? up : down, opacity: 0.8 },
               })),
             },
           ],
@@ -270,26 +345,40 @@ const baskets: any[] = data?.baskets ?? [];
         const z = chart.getOption().dataZoom?.[0];
         const s = Math.round(z?.start ?? 0);
         const e = Math.round(z?.end ?? 100);
-        const i0 = Math.floor((s / 100) * (n - 1));
-        const i1 = Math.max(i0, Math.ceil((e / 100) * (n - 1)));
-        const slice = flow.slice(i0, i1 + 1);
-        const total = slice.reduce((a: number, b: number) => a + b, 0);
-        const hasFlow = i1 >= flowStart;
-        const last = flow[n - 1] ?? 0;
+        const i0 = Math.floor((s / 100) * (bars.length - 1));
+        const i1 = Math.max(i0, Math.ceil((e / 100) * (bars.length - 1)));
+        const slice = bars.slice(i0, i1 + 1);
+        const total = slice.reduce((a, b) => a + b.flow, 0);
+        const hasFlow = slice.some((b) => b.hasFlow);
+        const lastBar = bars[bars.length - 1];
+        const last = lastBar?.flow ?? 0;
+        const unit = period === 'd' ? '当天' : '本期';
 
         legend.innerHTML = hasFlow
-          ? `<span>当天（${dates[n - 1]}） <strong class="${last >= 0 ? 'up' : 'down'}">${sig(last)} 亿</strong></span>` +
+          ? `<span>${unit}（${lastBar?.label ?? ''}） <strong class="${last >= 0 ? 'up' : 'down'}">${sig(
+              last
+            )} 亿</strong></span>` +
             `<span>可见区间累计 <strong class="${total >= 0 ? 'up' : 'down'}">${sig(total).replace(
               /\.\d+$/,
               ''
             )} 亿</strong></span>` +
-            `<span class="dim">${dates[i0]} ~ ${dates[i1]}</span>`
+            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`
           : `<span class="dim">这一段只有 K 线，ETF 份额从 ${dates[flowStart] || '近一年'} 才开始有</span>` +
-            `<span class="dim">${dates[i0]} ~ ${dates[i1]}</span>`;
+            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}</span>`;
       }
     }
 
     tabs.forEach((t) => t.addEventListener('click', () => render(Number(t.dataset.idx))));
+
+    // 周期切换：只在前端聚合，不用重新取数
+    const pbtns = Array.from(root.querySelectorAll('[data-period]')) as HTMLButtonElement[];
+    pbtns.forEach((b) => {
+      b.addEventListener('click', () => {
+        period = b.dataset.period || 'd';
+        pbtns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        render(current);
+      });
+    });
 
     render(0);
 
@@ -350,6 +439,37 @@ const baskets: any[] = data?.baskets ?? [];
     background: var(--accent);
     border-color: var(--accent);
     color: var(--on-accent);
+    font-weight: 600;
+  }
+
+  .fc__periods {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+
+  .fc__period {
+    min-width: 46px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .fc__period:hover {
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+
+  .fc__period[aria-pressed='true'] {
+    background: var(--accent-tint);
+    border-color: var(--accent-border);
+    color: var(--accent);
     font-weight: 600;
   }
 
