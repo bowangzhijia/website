@@ -7,6 +7,7 @@ import ContactCard from '../../../components/ContactCard.astro';
 import ColumnFeed from '../../../components/ColumnFeed.astro';
 import ArticleEditor from '../../../components/ArticleEditor.astro';
 import HotNewsTrigger from '../../../components/HotNewsTrigger.astro';
+import EtfShareBoard from '../../../components/EtfShareBoard.astro';
 import { COLUMNS, PLATFORMS, WELCOME, RISK_NOTE } from '../../../site.config';
 import { getPostsByColumn } from '../../../utils/posts';
 
@@ -56,6 +57,13 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
             {isHotNewsColumn && <HotNewsTrigger />}
           </div>
 
+          {/* ETF 份额栏目：页面主体就是看板，文章列表放在下面 */}
+          {column.id === 'etf-share' && (
+            <div class="feedpage__board">
+              <EtfShareBoard embedded />
+            </div>
+          )}
+
           <ColumnFeed posts={posts} columnId={column.id} />
 
           <div class="feedpage__sub">
@@ -87,15 +95,6 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
             )
           }
 
-          {/* 份额看板只在 ETF 栏目露出，其它栏目没有这个东西 */}
-          {
-            column.id === 'etf-boduan-wang' && (
-              <a class="sharelink" href="/etf-share/">
-                <span class="sharelink__t">ETF 份额看板</span>
-                <span class="sharelink__d">看每天谁在真金白银地买</span>
-              </a>
-            )
-          }
 
           <div id="subscribe">
             {isMessage ? <MessageForm /> : <SubscribeForm />}
@@ -223,33 +222,9 @@ const posts = canPost ? await getPostsByColumn(column.id) : [];
     margin: 0;
   }
 
-  /* 份额看板入口 */
-  .sharelink {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-top: 14px;
-    padding: 10px 16px;
-    border: 1px solid var(--accent-border);
-    border-radius: 10px;
-    background: var(--accent-tint);
-    text-decoration: none;
-    transition: background 0.18s ease;
-  }
-
-  .sharelink:hover {
-    background: var(--accent-wash);
-  }
-
-  .sharelink__t {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--accent);
-  }
-
-  .sharelink__d {
-    font-size: 12px;
-    color: var(--muted);
+  /* ETF 份额栏目：主体是看板 */
+  .feedpage__board {
+    margin: 4px 0 30px;
   }
 
   #subscribe {

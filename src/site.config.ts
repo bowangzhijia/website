@@ -95,6 +95,14 @@ export const COLUMNS: Column[] = [
     color: ['#f0a92b', '#ffd479'],
   },
   {
+    id: 'etf-share',
+    name: 'ETF份额',
+    tagline: '每天谁在真金白银地买',
+    desc: '按指数追踪沪深两市 ETF 份额变化，看主力资金是真申购还是假热闹。',
+    color: ['#0ea5e9', '#7dd3fc'],
+    kind: 'feed',
+  },
+  {
     id: 'chahuahui',
     name: '波王茶话会',
     tagline: '投资之外的闲聊',

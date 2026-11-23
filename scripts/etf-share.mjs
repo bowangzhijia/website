@@ -38,7 +38,7 @@ const DATA_DIR = join(ROOT, 'src', 'data', 'etf-share');
 const POSTS_DIR = join(ROOT, 'src', 'content', 'posts');
 
 /** 发到哪个栏目（对应 src/site.config.ts） */
-const COLUMN = 'etf-boduan-wang';
+const COLUMN = 'etf-share';
 
 /** 回溯时最多往前找几天 */
 const LOOKBACK_DAYS = 8;
