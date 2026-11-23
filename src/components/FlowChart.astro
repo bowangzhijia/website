@@ -50,6 +50,16 @@ const baskets: any[] = data?.baskets ?? [];
             </button>
           ))
         }
+        <span class="fc__divider" aria-hidden="true" />
+        {[
+          ['30', 'MA30', '#f0a92b'],
+          ['60', 'MA60', '#4a9eff'],
+          ['250', 'MA250', '#a855f7'],
+        ].map(([n, lab, color]) => (
+          <button class="fc__period fc__ma" type="button" data-ma={n} aria-pressed="true" style={`--ma:${color}`}>
+            {lab}
+          </button>
+        ))}
       </div>
 
       <div class="fc__legend" data-legend />
@@ -188,6 +198,34 @@ const baskets: any[] = data?.baskets ?? [];
       return bars;
     }
 
+    /** 均线颜色，跟主题无关，固定三色 */
+    const MA_COLORS: Record<number, string> = { 30: '#f0a92b', 60: '#4a9eff', 250: '#a855f7' };
+    const maOn: Record<number, boolean> = { 30: true, 60: true, 250: true };
+
+    /**
+     * 简单移动平均。均线跟着当前周期走——日K 是 30/60/250 日，
+     * 切到周K 就是 30/60/250 周，和看盘软件一致。
+     * 数据不足 n 根时给 null，图上就是断的，不会画出假的线头。
+     */
+    function movingAvg(bars: any[], n: number) {
+      const out: (number | null)[] = [];
+      const win: number[] = [];
+      let sum = 0;
+      for (const b of bars) {
+        if (b.c == null) {
+          out.push(null);
+          win.length = 0;
+          sum = 0;
+          continue;
+        }
+        win.push(b.c);
+        sum += b.c;
+        if (win.length > n) sum -= win.shift() as number;
+        out.push(win.length === n ? +(sum / n).toFixed(2) : null);
+      }
+      return out;
+    }
+
     function render(idxNo: number) {
       current = idxNo;
       const up = css('--up', '#d92d20');
@@ -204,6 +242,24 @@ const baskets: any[] = data?.baskets ?? [];
       const labels = bars.map((b) => b.label);
       // candlestick 要 [开, 收, 低, 高]，日线存的是 [开, 收, 高, 低]
       const ohlc = bars.map((b) => (b.o == null ? '-' : [b.o, b.c, b.l, b.h]));
+
+      // 均线只算一遍，tooltip 直接复用，别在 formatter 里重算
+      const maData: Record<number, (number | null)[]> = {};
+      for (const n of [30, 60, 250]) maData[n] = movingAvg(bars, n);
+
+      const maSeries = [30, 60, 250]
+        .filter((n) => maOn[n])
+        .map((n) => ({
+          name: `MA${n}`,
+          type: 'line',
+          data: maData[n],
+          showSymbol: false,
+          smooth: false,
+          connectNulls: false,
+          lineStyle: { width: 1.2, color: MA_COLORS[n] },
+          itemStyle: { color: MA_COLORS[n] },
+          z: 3,
+        }));
 
       // 切换周期时重置可视范围：默认看到最近 140 根
       if (lastPeriod !== period) {
@@ -244,6 +300,11 @@ const baskets: any[] = data?.baskets ?? [];
               } else {
                 s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
               }
+              const maLine = [30, 60, 250]
+                .filter((n) => maOn[n] && maData[n][i] != null)
+                .map((n) => `<span style="color:${MA_COLORS[n]}">MA${n} ${maData[n][i]}</span>`)
+                .join('　');
+              if (maLine) s += `<br/>${maLine}`;
               return s;
             },
           },
@@ -325,6 +386,7 @@ const baskets: any[] = data?.baskets ?? [];
                 itemStyle: { color: b.flow >= 0 ? up : down, opacity: 0.8 },
               })),
             },
+            ...maSeries,
           ],
         },
         true
@@ -376,6 +438,17 @@ const baskets: any[] = data?.baskets ?? [];
       b.addEventListener('click', () => {
         period = b.dataset.period || 'd';
         pbtns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        render(current);
+      });
+    });
+
+    // 均线开关
+    const mbtns = Array.from(root.querySelectorAll('[data-ma]')) as HTMLButtonElement[];
+    mbtns.forEach((b) => {
+      b.addEventListener('click', () => {
+        const n = Number(b.dataset.ma);
+        maOn[n] = !maOn[n];
+        b.setAttribute('aria-pressed', String(maOn[n]));
         render(current);
       });
     });
@@ -444,8 +517,17 @@ const baskets: any[] = data?.baskets ?? [];
 
   .fc__periods {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 4px;
     margin-bottom: 10px;
+  }
+
+  .fc__divider {
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: var(--border);
   }
 
   .fc__period {
@@ -471,6 +553,36 @@ const baskets: any[] = data?.baskets ?? [];
     border-color: var(--accent-border);
     color: var(--accent);
     font-weight: 600;
+  }
+
+  /* 均线开关：用各自的颜色，关掉时只留灰点 */
+  .fc__ma::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--ma);
+    opacity: 0.35;
+    vertical-align: 1px;
+  }
+
+  .fc__ma[aria-pressed='true'] {
+    background: transparent;
+    border-color: var(--ma);
+    color: var(--ma);
+    font-weight: 600;
+  }
+
+  .fc__ma[aria-pressed='true']::before {
+    opacity: 1;
+  }
+
+  .fc__ma[aria-pressed='false'] {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--muted);
   }
 
   .fc__legend {
