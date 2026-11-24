@@ -73,7 +73,7 @@ const baskets: any[] = data?.baskets ?? [];
 
 <script>
   import * as echarts from 'echarts/core';
-  import { CandlestickChart, BarChart } from 'echarts/charts';
+  import { CandlestickChart, BarChart, LineChart } from 'echarts/charts';
   import {
     GridComponent,
     TooltipComponent,
@@ -85,6 +85,7 @@ const baskets: any[] = data?.baskets ?? [];
   echarts.use([
     CandlestickChart,
     BarChart,
+    LineChart, // 均线要用，漏了它 line series 会被静默忽略
     GridComponent,
     TooltipComponent,
     DataZoomComponent,
