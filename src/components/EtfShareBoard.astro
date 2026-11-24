@@ -136,9 +136,10 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {baskets.length > 0 && (
             <section class="bk">
               <div class="bk__head">
-                <h2 class="bk__h">宽基篮子</h2>
+                <h2 class="bk__h">指数篮子</h2>
                 <p class="bk__sub">
                   一个指数挂十几只 ETF，是同一份敞口。汇金买哪只都一样，加总才看得出进了多少钱。
+                  点开任意一个能看成分明细；最后一个「创新药」是主题篮子，港股占六成。
                 </p>
               </div>
               <div class="bk__grid">
@@ -442,7 +443,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
   .bk__grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    /* 篮子从 6 个变 7 个，写死 3 列会让最后一行只剩一个，改成自适应 */
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
     gap: 10px;
   }
 
