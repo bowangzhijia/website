@@ -133,6 +133,14 @@ const baskets: any[] = data?.baskets ?? [];
     const flowDates: string[] = data.flowDates || [];
     const dateIdx = new Map(dates.map((d, i) => [d, i]));
 
+    /**
+     * 份额数据覆盖到哪一天。
+     * 只判断起点是不够的：K 线是当天的（今天有交易就有蜡烛），
+     * 但份额要等交易所收盘后才公布，末尾这几天在 flow 里是 0。
+     * 不区分「还没公布」和「没有变动」，就会把今天显示成「份额没有变动」。
+     */
+    const flowEnd = flowDates.length ? (dateIdx.get(flowDates[flowDates.length - 1]) ?? n - 1) : -1;
+
     function expand(short: number[]): number[] {
       const full = new Array(n).fill(0);
       for (let i = 0; i < flowDates.length; i++) {
@@ -299,7 +307,9 @@ const baskets: any[] = data?.baskets ?? [];
                   `<br/>开 ${b.o.toFixed(2)}　收 <b style="color:${rising ? up : down}">${b.c.toFixed(2)}</b>` +
                   `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
               }
-              if (!b.hasFlow) {
+              if (i > flowEnd) {
+                s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
+              } else if (!b.hasFlow) {
                 s += `<br/><span style="opacity:.6">ETF 份额从 ${dates[flowStart] || '2016 年'} 起才有记录</span>`;
               } else if (f === 0) {
                 s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
@@ -421,6 +431,19 @@ const baskets: any[] = data?.baskets ?? [];
         const lastBar = bars[bars.length - 1];
         const last = lastBar?.flow ?? 0;
         const unit = period === 'd' ? '当天' : '本期';
+
+        // 最后一根比份额数据还新，说明份额还没公布，别拿 0 充当「没变动」
+        const lastFlowDate = flowDates[flowDates.length - 1] || '';
+        if (lastBar && lastFlowDate && lastBar.label > lastFlowDate) {
+          legend.innerHTML =
+            `<span class="dim">${lastBar.label} 的份额还没公布，收盘后当晚更新</span>` +
+            `<span>可见区间累计 <strong class="${total >= 0 ? 'up' : 'down'}">${sig(total).replace(
+              /\.\d+$/,
+              ''
+            )} 亿</strong></span>` +
+            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`;
+          return;
+        }
 
         legend.innerHTML = hasFlow
           ? `<span>${unit}（${lastBar?.label ?? ''}） <strong class="${last >= 0 ? 'up' : 'down'}">${sig(

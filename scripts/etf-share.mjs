@@ -1273,6 +1273,21 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
     klineArr = [];
   }
 
+  /*
+   * 裁掉末尾「有日期但没有数据」的那几天。
+   *
+   * 踩过的坑：某次采集失败但留下了空壳快照，合并后 flowDates 会多出这一天，
+   * 所有篮子都算成 0。前端看到「份额有记录到这天」，就会把今天显示成
+   * 「份额没有变动」——其实是还没公布。全市场六个篮子同时恰好为 0 的概率
+   * 基本为零，所以末尾连续全 0 的直接裁掉是安全的。
+   */
+  while (dates.length > 1) {
+    const last = dates.length - 1;
+    if (Object.values(flows).some((f) => (f[last] || 0) !== 0)) break;
+    dates.pop();
+    for (const k of Object.keys(flows)) flows[k].pop();
+  }
+
   // 份额数据落在全历史时间轴的哪个位置（前面那段柱子是空的）
   let flowStart = klineDates.findIndex((d) => d >= dates[0]);
   if (flowStart < 0) flowStart = 0;
