@@ -99,10 +99,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
         <p class="sc__lead">
           {
             data
-              ? `${dateLabel} 数据，对比上一交易日（${data.prevDate}）。份额是真金白银的申购赎回，规模涨可能只是净值涨。`
-              : '还没有数据。等每日任务跑一次就会出来。'
+              ? `更新至 ${dateLabel} 收盘，对比上一交易日（${data.prevDate}）。份额是真金白银的申购赎回，规模涨可能只是净值涨。`
+              : '数据正在准备，稍后就有'
           }
         </p>
+        <p class="sc__meta">每个交易日 20:30 前后更新；当晚交易所尚未披露的，次日上午 9 点后补上</p>
       </header>
 
       {data && (
@@ -190,11 +191,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           )}
 
           <p class="scope">
-            全市场 <strong>{rows.length}</strong> 只 ETF，今天有 <strong>{changedCount}</strong> 只出现份额变动。
+            全市场 <strong>{rows.length}</strong> 只 ETF，当日有 <strong>{changedCount}</strong> 只出现份额变动。
             榜单只收录其中规模 ≥ {MIN_SCALE} 亿的（<strong>{pool.length}</strong> 只，{poolChanged} 只有变动）。
             门槛每天按最新规模重算，涨过线自动纳入、缩下去自动剔除，不用维护名单。
-            份额由交易所次日披露，所以数据是 T+1 的，不存在盘中实时。
-            搜不到的标的可以往下拉搜索框查，那里是全量。
+            份额是交易所收盘后披露的统计口径，不是盘中实时行情。
+            想看某只具体的，往下拉搜索框，那里是全量。
           </p>
 
           {/* 搜索是全量 987 行，静态渲染太重，交给 JS 过滤 */}
@@ -347,6 +348,14 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     color: var(--muted);
     font-size: 14px;
     line-height: 1.7;
+  }
+
+  /* 更新时间说明：别让读者以为数据没在更新 */
+  .sc__meta {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    opacity: 0.75;
   }
 
   .stats {

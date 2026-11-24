@@ -300,9 +300,9 @@ const baskets: any[] = data?.baskets ?? [];
                   `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
               }
               if (!b.hasFlow) {
-                s += '<br/><span style="opacity:.6">这段还没有 ETF 份额数据</span>';
+                s += `<br/><span style="opacity:.6">ETF 份额从 ${dates[flowStart] || '2016 年'} 起才有记录</span>`;
               } else if (f === 0) {
-                s += `<br/><span style="opacity:.6">本期数据缺失或份额无变化</span>`;
+                s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
               } else {
                 s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
               }
@@ -406,7 +406,7 @@ const baskets: any[] = data?.baskets ?? [];
       });
 
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
-      note.textContent = `柱子 = ${label} 每日净流入合计，只有 ${flowStart > 0 ? `${dates[flowStart]} 之后` : '有份额数据之后'}才有值`;
+      note.textContent = `柱子 = ${label} 每日净流入合计，份额记录从 ${dates[flowStart] || '2016 年'} 开始`;
       updateLegend();
 
       function updateLegend() {
@@ -431,7 +431,7 @@ const baskets: any[] = data?.baskets ?? [];
               ''
             )} 亿</strong></span>` +
             `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`
-          : `<span class="dim">这一段只有 K 线，ETF 份额从 ${dates[flowStart] || '近一年'} 才开始有</span>` +
+          : `<span class="dim">这一段只有 K 线，份额记录从 ${dates[flowStart] || '2016 年'} 起</span>` +
             `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}</span>`;
       }
     }
