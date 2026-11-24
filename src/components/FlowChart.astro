@@ -52,9 +52,9 @@ const baskets: any[] = data?.baskets ?? [];
         }
         <span class="fc__divider" aria-hidden="true" />
         {[
-          ['30', 'MA30', '#f0a92b'],
-          ['60', 'MA60', '#4a9eff'],
-          ['250', 'MA250', '#a855f7'],
+          ['30', 'MA30', 'var(--ma30)'],
+          ['60', 'MA60', 'var(--ma60)'],
+          ['250', 'MA250', 'var(--ma250)'],
         ].map(([n, lab, color]) => (
           <button class="fc__period fc__ma" type="button" data-ma={n} aria-pressed="true" style={`--ma:${color}`}>
             {lab}
@@ -199,8 +199,13 @@ const baskets: any[] = data?.baskets ?? [];
       return bars;
     }
 
-    /** 均线颜色，跟主题无关，固定三色 */
-    const MA_COLORS: Record<number, string> = { 30: '#f0a92b', 60: '#4a9eff', 250: '#a855f7' };
+    /**
+     * 均线颜色：30 红、60 绿、250 黑。
+     * 颜色走 CSS 变量，深浅主题各一套——纯黑在深色背景上是看不见的，
+     * 暗色下会自动换成浅灰。
+     */
+    const MA_FALLBACK: Record<number, string> = { 30: '#d92d20', 60: '#128a4e', 250: '#1f2937' };
+    const maColor = (n: number) => css(`--ma${n}`, MA_FALLBACK[n]);
     const maOn: Record<number, boolean> = { 30: true, 60: true, 250: true };
 
     /**
@@ -257,8 +262,8 @@ const baskets: any[] = data?.baskets ?? [];
           showSymbol: false,
           smooth: false,
           connectNulls: false,
-          lineStyle: { width: 1.2, color: MA_COLORS[n] },
-          itemStyle: { color: MA_COLORS[n] },
+          lineStyle: { width: 1.2, color: maColor(n) },
+          itemStyle: { color: maColor(n) },
           z: 3,
         }));
 
@@ -303,7 +308,7 @@ const baskets: any[] = data?.baskets ?? [];
               }
               const maLine = [30, 60, 250]
                 .filter((n) => maOn[n] && maData[n][i] != null)
-                .map((n) => `<span style="color:${MA_COLORS[n]}">MA${n} ${maData[n][i]}</span>`)
+                .map((n) => `<span style="color:${maColor(n)}">MA${n} ${maData[n][i]}</span>`)
                 .join('　');
               if (maLine) s += `<br/>${maLine}`;
               return s;
@@ -621,6 +626,19 @@ const baskets: any[] = data?.baskets ?? [];
 </style>
 
 <style is:global>
+  /* 均线配色：30 红 / 60 绿 / 250 黑。深色主题下 250 换成浅灰，否则黑线贴在黑底上看不见 */
+  :root {
+    --ma30: #d92d20;
+    --ma60: #128a4e;
+    --ma250: #1f2937;
+  }
+
+  html[data-theme='dark'] {
+    --ma30: #ff4d4f;
+    --ma60: #17c964;
+    --ma250: #d1d5db;
+  }
+
   /* 图例由 JS 生成，拿不到作用域标记 */
   .fc__legend .up {
     color: var(--up);
