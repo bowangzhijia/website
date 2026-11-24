@@ -383,8 +383,23 @@ async function collectDay(date) {
   }
 
   const snap = mergeDay({ date, sse, szseMain, szseBackup });
-  console.log(`   合并后 ${snap.items.length} 只（沪 ${snap.items.filter((x) => x.market === 'sh').length} / 深 ${snap.items.filter((x) => x.market === 'sz').length}）`);
+  const shCount = snap.items.filter((x) => x.market === 'sh').length;
+  const szCount = snap.items.filter((x) => x.market === 'sz').length;
+  console.log(`   合并后 ${snap.items.length} 只（沪 ${shCount} / 深 ${szCount}）`);
   if (snap.warnings.length) console.log(`   ⚠ ${snap.warnings.join('；')}`);
+
+  /*
+   * 完整性闸门：沪深任何一边明显缺失就不写盘。
+   *
+   * 踩过的坑：沪市当天数据还没发布（返回 0 条）时，深市备源仍能拉到 580 只，
+   * 合并后照样写盘，等于把「只有深市」的半截快照当成全市场数据，
+   * 下一次算份额变化会凭空造出巨额差异。宁可今天没数据，也不要脏数据。
+   */
+  const MIN_PER_MARKET = 400;
+  if (shCount < MIN_PER_MARKET || szCount < MIN_PER_MARKET) {
+    console.warn(`   数据不完整（沪 ${shCount} / 深 ${szCount}，各需 ≥ ${MIN_PER_MARKET}），本次不写盘`);
+    return null;
+  }
 
   // 补价格。拿不到不致命——榜单退化成只按份额变化率排，不显示金额
   const quotes = await fetchEmQuotes(snap.items);
@@ -1294,7 +1309,7 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
 // ============================================================
 
 function parseArgs() {
-  const out = { date: null, days: 1, article: true, force: false, deep: 0 };
+  const out = { date: null, days: 1, article: true, force: false, deep: 0, refresh: false };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--date=')) out.date = a.slice(7);
     else if (a.startsWith('--days=')) out.days = Number(a.slice(7)) || 1;
@@ -1304,6 +1319,7 @@ function parseArgs() {
     else if (a === '--no-article') out.article = false;
     else if (a === '--force') out.force = true;
     else if (a === '--no-kline') out.nokline = true;
+    else if (a === '--refresh') out.refresh = true;
   }
   return out;
 }
@@ -1362,8 +1378,9 @@ async function main() {
   for (let i = 0; i <= LOOKBACK_DAYS; i++) {
     const d = shiftDate(today, -i);
     if (isWeekend(d)) continue;
-    // 这一天的文章已经有了，说明当天已经成功跑过一次，后面几个时段不用再抓
-    if (args.article && articleDone(d) && !args.force) {
+    // 这一天的文章已经有了，说明当天已经成功跑过一次，后面几个时段不用再抓。
+    // --refresh 是例外：晚间先出结果，次日早上再抓一遍核对，交易所若有修正就覆盖。
+    if (args.article && articleDone(d) && !args.force && !args.refresh) {
       console.log(`${d} 的文章已存在，本次跳过`);
       await buildHistory();
       return;
