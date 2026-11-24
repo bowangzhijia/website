@@ -1168,11 +1168,17 @@ async function flowsFromExchange(bars, fromDate, toDate) {
   }
 
   console.log(`   深市按代码抓取（${szCodes.length} 只）…`);
+  let szHit = 0;
   for (const code of szCodes) {
     const m = await fetchSzseHistory(code, from, to);
+    if (m.size) szHit++;
     for (const [d, s] of m) put(code, d, s);
     await sleep(150);
   }
+
+  // 深市全挂的时候，沪市数据照抓，算出来的 flow 会系统性偏小。
+  // 宁可不更新，也不要拿「只有沪市」的数据去覆盖历史。
+  if (szHit === 0) throw new Error('深市份额一只都没抓到，中止（避免写入残缺历史）');
 
   console.log('   抓成分 ETF 的历史价格（腾讯）…');
   const px = new Map();
@@ -1304,7 +1310,12 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
     flowStart,
     kline: klineArr,
     // 篮子 flow 只存有份额的那一段，页面上按 flowStart 铺到全历史
-    baskets: loadBaskets().map((b) => ({ id: b.id, name: b.name, flow: flows[b.id] || [] })),
+    baskets: loadBaskets().map((b) => {
+      const flow = flows[b.id] || [];
+      // 新加的篮子不会回溯到 2016 年，记下它从哪天开始有数据，前端据此提示
+      const first = flow.findIndex((v) => v !== 0);
+      return { id: b.id, name: b.name, flow, start: first >= 0 ? dates[first] : dates[0] };
+    }),
     aggregate,
   };
   const body = JSON.stringify(out);

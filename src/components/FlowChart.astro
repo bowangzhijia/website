@@ -251,6 +251,8 @@ const baskets: any[] = data?.baskets ?? [];
       const basket = baskets[idxNo];
       const flow = fulls[idxNo] ?? aggFull;
       const label = basket ? `${basket.name} 篮子` : '六大宽基合计';
+      // 每个篮子各自的起点：新加的篮子只回溯了两年，不能按全局起点提示
+      const bStart = basket?.start || dates[flowStart] || dates[0];
 
       const bars = group(flow);
       const labels = bars.map((b) => b.label);
@@ -309,8 +311,8 @@ const baskets: any[] = data?.baskets ?? [];
               }
               if (i > flowEnd) {
                 s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
-              } else if (!b.hasFlow) {
-                s += `<br/><span style="opacity:.6">ETF 份额从 ${dates[flowStart] || '2016 年'} 起才有记录</span>`;
+              } else if (b.label < bStart) {
+                s += `<br/><span style="opacity:.6">这个篮子的份额记录从 ${bStart} 起</span>`;
               } else if (f === 0) {
                 s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
               } else {
@@ -427,7 +429,7 @@ const baskets: any[] = data?.baskets ?? [];
         const i1 = Math.max(i0, Math.ceil((e / 100) * (bars.length - 1)));
         const slice = bars.slice(i0, i1 + 1);
         const total = slice.reduce((a, b) => a + b.flow, 0);
-        const hasFlow = slice.some((b) => b.hasFlow);
+        const hasFlow = slice.some((b) => b.label >= bStart);
         const lastBar = bars[bars.length - 1];
         const last = lastBar?.flow ?? 0;
         const unit = period === 'd' ? '当天' : '本期';
@@ -454,7 +456,7 @@ const baskets: any[] = data?.baskets ?? [];
               ''
             )} 亿</strong></span>` +
             `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`
-          : `<span class="dim">这一段只有 K 线，份额记录从 ${dates[flowStart] || '2016 年'} 起</span>` +
+          : `<span class="dim">这一段只有 K 线，这个篮子的份额记录从 ${bStart} 起</span>` +
             `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}</span>`;
       }
     }
