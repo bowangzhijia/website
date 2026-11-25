@@ -576,30 +576,6 @@ function computeChanges(date) {
   return { prev: prevDate, rows };
 }
 
-/**
- * A 股休市日（只列工作日，周末另有判断）。
- *
- * 为什么需要：长假期间定时器照常触发，每次都去抓数据、发现抓不到再往前找，
- * 一天白跑十几次。有了日历可以在门口直接拦住。
- *
- * 来源是上交所「休市安排」栏目，交易所是**分节日发公告**的，不是次年初一次性给全年，
- * 所以每年 12 月前后要回来补当年的日期，否则元旦之后判断就失效了。
- */
-function loadHolidays() {
-  const p = join(DATA_DIR, 'holidays.json');
-  if (!existsSync(p)) return new Set();
-  try {
-    const j = JSON.parse(readFileSync(p, 'utf8'));
-    const out = new Set();
-    for (const arr of Object.values(j.years || {})) {
-      for (const d of arr) out.add(d);
-    }
-    return out;
-  } catch {
-    return new Set();
-  }
-}
-
 /** 宽基篮子配置（人工维护，交易所接口不给跟踪标的） */
 function loadBaskets() {
   const p = join(DATA_DIR, 'baskets.json');
@@ -1425,7 +1401,8 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
 
   if (!changed) console.log('   历史数据没有实质变化，跳过写盘（避免触发无意义的部署）');
 
-  console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天，${Math.round(body.length / 1024)}KB）`);
+  const sizeKb = Math.round(JSON.stringify(out).length / 1024);
+  console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天，${sizeKb}KB）`);
 }
 
 // ============================================================
@@ -1497,31 +1474,6 @@ async function main() {
     if (args.article) generateArticle(target);
     await buildHistory();
     return;
-  }
-
-  /*
-   * 休市日跳过，但**假期第一天例外**。
-   *
-   * 为什么：长假第一天相当于「周六」——节前最后一个交易日的数据如果当晚没抓到
-   * （交易所发布晚、接口抽签失败），本该在第二天早上补上。要是长假一律跳过，
-   * 这份数据就要等到开市后才有，断更七八天。
-   *
-   * 判断「第一天」的方式：今天在假期表里，但昨天不在。这样春节（前天是周末）
-   * 和国庆（前天是 9-30）都能正确识别，而假期中段则安静跳过。
-   */
-  const holidays = loadHolidays();
-  if (holidays.has(today)) {
-    // 往前跳过周末再比：春节假期中间常夹着周六日，
-    // 直接看昨天会把「节后第一个工作日」误判成假期第一天。
-    let prev = shiftDate(today, -1);
-    for (let g = 0; g < 5 && isWeekend(prev); g++) prev = shiftDate(prev, -1);
-    const isFirstDay = !holidays.has(prev);
-
-    if (!(args.refresh && isFirstDay)) {
-      console.log(`${today} 休市${isFirstDay ? '' : '（假期中）'}，跳过本次运行`);
-      return;
-    }
-    console.log(`${today} 是假期第一天，跑一次复核，补节前最后一天的数据`);
   }
 
   /*
