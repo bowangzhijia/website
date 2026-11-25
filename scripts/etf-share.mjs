@@ -380,7 +380,7 @@ function writeIfChanged(path, obj, ignoreKeys = []) {
 function saveSnapshot(snap) {
   const dir = join(DATA_DIR, 'daily');
   mkdirSync(dir, { recursive: true });
-  writeIfChanged(snapshotPath(snap.date), snap);
+  writeIfChanged(snapshotPath(snap.date), snap, ['generatedAt']);
   _snapCache.set(snap.date, snap);
 }
 
