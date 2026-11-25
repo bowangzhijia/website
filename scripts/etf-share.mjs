@@ -41,7 +41,13 @@ const POSTS_DIR = join(ROOT, 'src', 'content', 'posts');
 const COLUMN = 'etf-share';
 
 /** 回溯时最多往前找几天 */
-const LOOKBACK_DAYS = 8;
+/**
+ * 往前找几个自然日。
+ *
+ * 定 15 是为了覆盖最长假期：春节连休可能 9~10 天，加上前后周末，
+ * 8 天会够不着节前最后一个交易日，任务直接报错、数据断更。
+ */
+const LOOKBACK_DAYS = 15;
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -1465,6 +1471,25 @@ async function main() {
       return;
     }
     if (args.article) generateArticle(target);
+    await buildHistory();
+    return;
+  }
+
+  /*
+   * 晚间首跑只看今天，不往前找。
+   *
+   * 原因：长假期间（国庆、春节）每天都在触发，如果每次都往前抓节前那一天，
+   * 一抓就是 40 秒抓取 + 30 秒重建，8 天假期白跑几十次。而且抓到的数据完全没变，
+   * 写盘那步会直接跳过，纯浪费时间。
+   * 今天没数据就直接退出，等下一轮；真要补昨天的，交给 --refresh（次日早上那几次）。
+   */
+  if (!args.refresh) {
+    const snap = await collectDay(today);
+    if (!snap) {
+      console.log(`${today} 还没有数据（未发布或非交易日），等下一轮`);
+      return;
+    }
+    if (args.article) generateArticle(today);
     await buildHistory();
     return;
   }
