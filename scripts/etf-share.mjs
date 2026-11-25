@@ -353,10 +353,34 @@ function snapshotPath(date) {
   return join(DATA_DIR, 'daily', `${date}.json`);
 }
 
+/**
+ * 只在内容真的变了才写盘。
+ *
+ * 为什么需要：外部定时器可能每 30 分钟触发一次，如果每次都把 generatedAt /
+ * updated 这类时间戳刷新一遍，git 就会认为有改动 → 提交 → 构建 → 部署。
+ * Cloudflare Pages 免费版每月只有 500 次构建；按每小时两次算，一个月 1400 多次，
+ * 两天就把额度烧光，真需要部署时反而失败。
+ *
+ * 忽略时间戳后，只有份额数据实质变化才会触发部署。
+ */
+function writeIfChanged(path, obj, ignoreKeys = []) {
+  const strip = (o) => JSON.stringify(o, (k, v) => (ignoreKeys.includes(k) ? undefined : v));
+  if (existsSync(path)) {
+    try {
+      const old = JSON.parse(readFileSync(path, 'utf8'));
+      if (strip(old) === strip(obj)) return false;
+    } catch {
+      // 旧文件坏了就当变了，正常重写
+    }
+  }
+  writeFileSync(path, JSON.stringify(obj), 'utf8');
+  return true;
+}
+
 function saveSnapshot(snap) {
   const dir = join(DATA_DIR, 'daily');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(snapshotPath(snap.date), JSON.stringify(snap), 'utf8');
+  writeIfChanged(snapshotPath(snap.date), snap);
   _snapCache.set(snap.date, snap);
 }
 
@@ -868,7 +892,7 @@ function writeLatest(date, { prev, rows }, dates) {
       .sort((a, b) => b.d - a.d),
   };
 
-  writeFileSync(join(DATA_DIR, 'latest.json'), JSON.stringify(out), 'utf8');
+  writeIfChanged(join(DATA_DIR, 'latest.json'), out, ['generatedAt']);
   console.log(`   ✔ 已更新 latest.json（${out.rows.length} 行）`);
 }
 
@@ -1361,14 +1385,15 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
     }),
     aggregate,
   };
-  const body = JSON.stringify(out);
-  writeFileSync(histPath, body, 'utf8');
+  const changed = writeIfChanged(histPath, out, ['updated']);
 
   // 再往 public 放一份给页面异步加载：11 年的 K 线直接内嵌进 HTML 有 500KB，
   // 首屏会被拖慢，拆成独立文件让浏览器缓存更划算
   const pubDir = join(ROOT, 'public', 'data', 'etf-share');
   mkdirSync(pubDir, { recursive: true });
-  writeFileSync(join(pubDir, 'history.json'), body, 'utf8');
+  writeIfChanged(join(pubDir, 'history.json'), out, ['updated']);
+
+  if (!changed) console.log('   历史数据没有实质变化，跳过写盘（避免触发无意义的部署）');
 
   console.log(`   ✔ 已更新 history.json（K 线 ${klineDates.length} 根，资金流 ${dates.length} 天，${Math.round(body.length / 1024)}KB）`);
 }
