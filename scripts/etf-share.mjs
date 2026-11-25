@@ -1499,11 +1499,29 @@ async function main() {
     return;
   }
 
-  // 休市日直接返回，不抓数据也不重建图表。周末由 isWeekend 另判。
+  /*
+   * 休市日跳过，但**假期第一天例外**。
+   *
+   * 为什么：长假第一天相当于「周六」——节前最后一个交易日的数据如果当晚没抓到
+   * （交易所发布晚、接口抽签失败），本该在第二天早上补上。要是长假一律跳过，
+   * 这份数据就要等到开市后才有，断更七八天。
+   *
+   * 判断「第一天」的方式：今天在假期表里，但昨天不在。这样春节（前天是周末）
+   * 和国庆（前天是 9-30）都能正确识别，而假期中段则安静跳过。
+   */
   const holidays = loadHolidays();
   if (holidays.has(today)) {
-    console.log(`${today} 休市，跳过本次运行`);
-    return;
+    // 往前跳过周末再比：春节假期中间常夹着周六日，
+    // 直接看昨天会把「节后第一个工作日」误判成假期第一天。
+    let prev = shiftDate(today, -1);
+    for (let g = 0; g < 5 && isWeekend(prev); g++) prev = shiftDate(prev, -1);
+    const isFirstDay = !holidays.has(prev);
+
+    if (!(args.refresh && isFirstDay)) {
+      console.log(`${today} 休市${isFirstDay ? '' : '（假期中）'}，跳过本次运行`);
+      return;
+    }
+    console.log(`${today} 是假期第一天，跑一次复核，补节前最后一天的数据`);
   }
 
   /*
