@@ -576,6 +576,30 @@ function computeChanges(date) {
   return { prev: prevDate, rows };
 }
 
+/**
+ * A 股休市日（只列工作日，周末另有判断）。
+ *
+ * 为什么需要：长假期间定时器照常触发，每次都去抓数据、发现抓不到再往前找，
+ * 一天白跑十几次。有了日历可以在门口直接拦住。
+ *
+ * 来源是上交所「休市安排」栏目，交易所是**分节日发公告**的，不是次年初一次性给全年，
+ * 所以每年 12 月前后要回来补当年的日期，否则元旦之后判断就失效了。
+ */
+function loadHolidays() {
+  const p = join(DATA_DIR, 'holidays.json');
+  if (!existsSync(p)) return new Set();
+  try {
+    const j = JSON.parse(readFileSync(p, 'utf8'));
+    const out = new Set();
+    for (const arr of Object.values(j.years || {})) {
+      for (const d of arr) out.add(d);
+    }
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
 /** 宽基篮子配置（人工维护，交易所接口不给跟踪标的） */
 function loadBaskets() {
   const p = join(DATA_DIR, 'baskets.json');
@@ -1472,6 +1496,13 @@ async function main() {
     }
     if (args.article) generateArticle(target);
     await buildHistory();
+    return;
+  }
+
+  // 休市日直接返回，不抓数据也不重建图表。周末由 isWeekend 另判。
+  const holidays = loadHolidays();
+  if (holidays.has(today)) {
+    console.log(`${today} 休市，跳过本次运行`);
     return;
   }
 
