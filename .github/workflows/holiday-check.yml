@@ -1,0 +1,35 @@
+# 检查休市日历是否需要补年份。缺了就开 Issue 提醒（GitHub 会发邮件）。
+#
+# 为什么单独一个 workflow：它不是每日任务，一年只需要动一两次，
+# 放在 etf-share.yml 里会每天白跑。
+#
+# 时间点：每月 1 号跑一次。国务院办公厅固定 11 月初发布次年安排，
+# 所以 10 月那次开始就会发现"明年缺失"，留出足够时间补。
+
+name: 休市日历检查
+
+on:
+  schedule:
+    # 北京时间每月 1 号 10:00
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 检查并提醒
+        run: node scripts/check-holidays.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
