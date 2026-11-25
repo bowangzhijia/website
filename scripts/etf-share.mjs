@@ -247,6 +247,49 @@ async function fetchEmQuotes(items) {
     }
     await sleep(120);
   }
+
+  // 东财被掐的时候经常一批都拿不到，价格缺了净流入就全算不出来，用腾讯补
+  if (quotes.size < items.length * 0.5) {
+    console.warn(`   东财报价只拿到 ${quotes.size}/${items.length}，改用腾讯兜底`);
+    const tx = await fetchTencentQuotes(items);
+    for (const [k, v] of tx) quotes.set(k, v);
+    console.log(`   腾讯补到 ${quotes.size}/${items.length}`);
+  }
+  return quotes;
+}
+
+/**
+ * 腾讯批量报价，东财被掐时的兜底。
+ *
+ * 返回 GBK 编码的文本，格式 `v_sh510300="1~名称~代码~现价~昨收~..."`，
+ * 按 ~ 切开后：3 是收盘价、32 是涨跌幅。
+ */
+async function fetchTencentQuotes(items) {
+  const quotes = new Map();
+  const CHUNK = 60;
+  const dec = new TextDecoder('gbk');
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const batch = items.slice(i, i + CHUNK);
+    const q = batch.map((x) => `${x.market === 'sh' ? 'sh' : 'sz'}${x.code}`).join(',');
+    const url = `https://qt.gtimg.cn/q=${q}`;
+    try {
+      const r = await fetch(url, { headers: H_TX });
+      const text = dec.decode(await r.arrayBuffer());
+      for (const line of text.split(';')) {
+        const m = /v_(?:sh|sz)(\d{6})="([^"]*)"/.exec(line);
+        if (!m) continue;
+        const f = m[2].split('~');
+        const close = Number(f[3]);
+        const chg = Number(f[32]);
+        if (Number.isFinite(close) && close > 0) {
+          quotes.set(m[1], { close, chgPct: Number.isFinite(chg) ? chg : null });
+        }
+      }
+    } catch {
+      // 这一批失败就算了，能补多少补多少
+    }
+    await sleep(150);
+  }
   return quotes;
 }
 
