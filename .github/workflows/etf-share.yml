@@ -30,6 +30,12 @@ on:
     # 次日 10:10（UTC 02:10）最后兜底
     - cron: '10 2 * * 1-5'
   workflow_dispatch:
+  # 允许外部定时器触发（cron-job.org 之类）。
+  # GitHub 自己的 schedule 延迟能到几小时，靠它做"晚上轮询"没意义，
+  # 所以真正的轮询交给外部，GitHub 只负责执行抓取。
+  # 触发时 github.event.schedule 为空，会走下面的 --refresh 分支。
+  repository_dispatch:
+    types: [etf-share]
 
 permissions:
   contents: write
