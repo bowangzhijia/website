@@ -43,4 +43,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name bowangzhijia
+          # --functions 必须显式给：不显式指定时 wrangler 不一定会带上 functions 目录，
+          # 结果就是中间件静默失效（页面照常公开，很难发现）
+          command: pages deploy dist --project-name bowangzhijia --functions=functions
