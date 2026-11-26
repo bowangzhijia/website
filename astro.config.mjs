@@ -15,12 +15,7 @@ export default defineConfig({
   redirects: {
     '/etf-share': '/columns/etf-share/',
   },
-  integrations: [
-    sitemap({
-      // 私密栏目不进 sitemap，避免被搜索引擎收录
-      filter: (page) => !page.includes('/columns/etf-share/') && !page.includes('/etf-share/'),
-    }),
-  ],
+  integrations: [sitemap()],
   /*
    * 链接预取：页面加载后，把视口里出现的站内链接提前下载好。
    * 点栏目的时候页面已经在本地了，不用再等网络往返——

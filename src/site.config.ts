@@ -109,7 +109,6 @@ export const COLUMNS: Column[] = [
     desc: '按指数追踪沪深两市 ETF 份额变化，看主力资金是真申购还是假热闹。',
     color: ['#0ea5e9', '#7dd3fc'],
     kind: 'feed',
-    private: true,
   },
   {
     id: 'chahuahui',
