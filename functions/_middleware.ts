@@ -24,7 +24,6 @@ interface Ctx {
 }
 
 const COOKIE = 'bw_unlock';
-const MAX_AGE = 60 * 60 * 24 * 30; // 30 天
 
 /** 受保护的路径前缀 */
 const GUARDED = ['/columns/etf-share', '/data/etf-share'];

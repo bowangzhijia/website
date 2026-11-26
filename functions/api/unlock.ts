@@ -7,6 +7,12 @@
 
 interface Env {
   SITE_PASSWORD?: string;
+  /**
+   * 免输口令的小时数，默认 720（30 天）。
+   * 想在 Cloudflare 后台调，加一个变量 SITE_UNLOCK_HOURS，单位小时：
+   *   24 = 1 天   168 = 7 天   720 = 30 天   2160 = 90 天   8760 = 1 年
+   */
+  SITE_UNLOCK_HOURS?: string;
 }
 
 /** 手写上下文类型，不引 @cloudflare/workers-types（会和 wrangler 3.x 的 peer 依赖打架） */
@@ -16,7 +22,6 @@ interface Ctx {
 }
 
 const COOKIE = 'bw_unlock';
-const MAX_AGE = 60 * 60 * 24 * 30; // 30 天
 
 const enc = new TextEncoder();
 
@@ -57,7 +62,12 @@ export const onRequestPost = async (ctx: Ctx): Promise<Response> => {
   }
 
   const token = await signature(pass);
-  const cookie = `${COOKIE}=${token}; Path=/; Max-Age=${MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
+
+  // 免输时长，环境变量没配就用 30 天
+  const hours = Number(ctx.env.SITE_UNLOCK_HOURS);
+  const maxAge = (Number.isFinite(hours) && hours > 0 ? hours : 720) * 3600;
+
+  const cookie = `${COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 
   return new Response(null, {
     status: 204,
