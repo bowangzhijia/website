@@ -1,0 +1,280 @@
+---
+/**
+ * 抓取运行状态条。
+ *
+ * 默认只占一行：一个状态点 + 一句话，点「最近运行」才展开最近 5 次记录。
+ *
+ * 状态是**前端实时查 GitHub Actions** 得到的，不是构建时写死的——
+ * 因为要回答的是「今天到底抓没抓」，这东西构建时不可能知道。
+ * 公开仓库查 Actions 不需要 token，但有 60 次/小时/IP 的匿名限额，
+ * 超了或者网络不通就退化成「状态不可用」，不影响页面其他部分。
+ */
+interface Props {
+  /** 当前页面数据对应的日期，比如 2026-11-25 */
+  date: string;
+  repo?: string;
+}
+
+const { date, repo = 'bowangzhijia/website' } = Astro.props;
+
+/** 2026-11-25 → 11月25日 */
+const [y, m, d] = date.split('-');
+const label = `${Number(m)}月${Number(d)}日`;
+---
+
+<section class="rs" data-runstatus data-repo={repo}>
+  <div class="rs__line">
+    <span class="rs__dot" data-dot></span>
+    <strong class="rs__date">数据更新至 {label}</strong>
+    <span class="rs__sep">·</span>
+    <span class="rs__state" data-state>正在检查抓取状态…</span>
+    <button class="rs__toggle" type="button" data-toggle aria-expanded="false">最近运行</button>
+  </div>
+
+  <ul class="rs__list" data-list hidden></ul>
+
+  <noscript>
+    <p class="rs__noscript">开启 JavaScript 可查看抓取状态</p>
+  </noscript>
+</section>
+
+<script>
+  const root = document.querySelector('[data-runstatus]') as HTMLElement | null;
+
+  if (root) {
+    const repo = root.dataset.repo || 'bowangzhijia/website';
+    const dot = root.querySelector('[data-dot]') as HTMLElement;
+    const state = root.querySelector('[data-state]') as HTMLElement;
+    const list = root.querySelector('[data-list]') as HTMLElement;
+    const toggle = root.querySelector('[data-toggle]') as HTMLButtonElement;
+
+    /** UTC → 北京时间 MM-DD HH:mm */
+    const fmt = (iso: string) => {
+      const t = new Date(iso).getTime() + 8 * 3600e3;
+      return new Date(t).toISOString().slice(5, 16).replace('T', ' ');
+    };
+
+    const EVENT: Record<string, string> = {
+      schedule: '定时',
+      workflow_dispatch: '外部触发',
+      push: '代码推送',
+      repository_dispatch: '外部触发',
+    };
+
+    const CONCL: Record<string, string> = {
+      success: '成功',
+      failure: '失败',
+      cancelled: '取消',
+      skipped: '跳过',
+    };
+
+    fetch(`https://api.github.com/repos/${repo}/actions/workflows/etf-share.yml/runs?per_page=5`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((j) => {
+        const runs = (j.workflow_runs || []) as any[];
+        if (!runs.length) {
+          state.textContent = '还没有运行记录';
+          return;
+        }
+
+        const last = runs[0];
+        const running = last.status === 'in_progress' || last.status === 'queued';
+        const ok = last.conclusion === 'success';
+
+        dot.className = 'rs__dot ' + (running ? 'is-run' : ok ? 'is-ok' : 'is-bad');
+
+        if (running) {
+          state.textContent = `正在抓取（${EVENT[last.event] || last.event}）`;
+        } else {
+          const when = fmt(last.created_at);
+          const how = EVENT[last.event] || last.event;
+          const res = CONCL[last.conclusion] || last.conclusion || '结束';
+          state.textContent = `最近一次 ${when} ${how} ${res}`;
+          if (!ok) state.classList.add('is-bad');
+        }
+
+        list.innerHTML = runs
+          .map((r) => {
+            const okR = r.conclusion === 'success';
+            const runR = r.status === 'in_progress' || r.status === 'queued';
+            const cls = runR ? 'is-run' : okR ? 'is-ok' : 'is-bad';
+            const txt = runR ? '进行中' : CONCL[r.conclusion] || r.conclusion || '—';
+            return (
+              `<li class="rs__item"><span class="rs__dot ${cls}"></span>` +
+              `<span class="rs__t">${fmt(r.created_at)}</span>` +
+              `<span class="rs__e">${EVENT[r.event] || r.event}</span>` +
+              `<span class="rs__c ${cls}">${txt}</span></li>`
+            );
+          })
+          .join('');
+
+        toggle.hidden = false;
+      })
+      .catch(() => {
+        dot.className = 'rs__dot is-unknown';
+        state.textContent = '状态查询失败（网络或额度限制）';
+      });
+
+    toggle.addEventListener('click', () => {
+      const open = list.hasAttribute('hidden');
+      if (open) list.removeAttribute('hidden');
+      else list.setAttribute('hidden', '');
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? '收起' : '最近运行';
+    });
+  }
+</script>
+
+<style>
+  .rs {
+    margin: 0 0 14px;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .rs__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .rs__dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.5;
+  }
+
+  .rs__dot.is-ok {
+    background: var(--down);
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--down) 18%, transparent);
+  }
+
+  .rs__dot.is-bad {
+    background: var(--up);
+    opacity: 1;
+  }
+
+  .rs__dot.is-run {
+    background: var(--accent);
+    opacity: 1;
+    animation: rs-pulse 1.2s ease-in-out infinite;
+  }
+
+  .rs__dot.is-unknown {
+    background: var(--muted);
+    opacity: 0.5;
+  }
+
+  @keyframes rs-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .rs__date {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .rs__sep {
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .rs__state {
+    color: var(--muted);
+  }
+
+  .rs__state.is-bad {
+    color: var(--up);
+  }
+
+  .rs__toggle {
+    margin-left: auto;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-family: var(--font);
+    cursor: pointer;
+  }
+
+  .rs__toggle:hover {
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+
+  .rs__list {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .rs__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .rs__item:last-child {
+    border-bottom: 0;
+  }
+
+  .rs__t {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rs__e {
+    color: var(--text-dim);
+  }
+
+  .rs__c {
+    margin-left: auto;
+  }
+
+  .rs__c.is-ok {
+    color: var(--down);
+  }
+
+  .rs__c.is-bad {
+    color: var(--up);
+  }
+
+  .rs__c.is-run {
+    color: var(--accent);
+  }
+
+  .rs__noscript {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 560px) {
+    .rs__line {
+      font-size: 12px;
+    }
+
+    .rs__toggle {
+      margin-left: 0;
+    }
+  }
+</style>
