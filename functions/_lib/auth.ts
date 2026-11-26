@@ -12,7 +12,9 @@
 
 export interface Env {
   SITE_PASSWORD?: string;
-  /** 免输口令的小时数，默认 720（30 天） */
+  /** 免输口令的天数，默认 30。填 7 就是 7 天，填 365 就是一年 */
+  SITE_UNLOCK_DAYS?: string;
+  /** 兼容旧变量（小时），SITE_UNLOCK_DAYS 存在时以天为准 */
   SITE_UNLOCK_HOURS?: string;
 }
 
@@ -40,10 +42,19 @@ export async function sign(password: string, issuedAt: number): Promise<string> 
   return hex(sig);
 }
 
-/** 免输时长（小时），读环境变量，没配或非法就用默认 30 天 */
+/**
+ * 免输时长（小时）。
+ * 优先读 SITE_UNLOCK_DAYS（按天填更直观），没配再退回 SITE_UNLOCK_HOURS，
+ * 都没有就用默认 30 天。
+ */
 export function unlockHours(env: Env): number {
-  const h = Number(env.SITE_UNLOCK_HOURS);
-  return Number.isFinite(h) && h > 0 ? h : DEFAULT_HOURS;
+  const days = Number(env.SITE_UNLOCK_DAYS);
+  if (Number.isFinite(days) && days > 0) return days * 24;
+
+  const hours = Number(env.SITE_UNLOCK_HOURS);
+  if (Number.isFinite(hours) && hours > 0) return hours;
+
+  return DEFAULT_HOURS;
 }
 
 export function readCookie(req: Request, name: string): string | null {
