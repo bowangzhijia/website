@@ -107,7 +107,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
         <p class="sc__meta">每个交易日 20:30 前后更新；当晚交易所尚未披露的，次日上午 9 点后补上</p>
       </header>
 
-      {data && <RunStatus date={data.date} />}
+      {data && <RunStatus date={data.date} total={data.total} />}
 
       {data && (
         <>
