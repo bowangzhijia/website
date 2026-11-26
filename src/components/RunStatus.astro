@@ -14,17 +14,16 @@ interface Props {
   date: string;
   /** 采集到的 ETF 只数，用来判断沪深是不是都齐了 */
   total?: number;
-  repo?: string;
 }
 
-const { date, total = 0, repo = 'bowangzhijia/website' } = Astro.props;
+const { date, total = 0 } = Astro.props;
 
 /** 2026-11-25 → 11月25日 */
 const [, m, d] = date.split('-');
 const label = `${Number(m)}月${Number(d)}日`;
 ---
 
-<section class="rs" data-runstatus data-repo={repo} data-date={date} data-total={total}>
+<section class="rs" data-runstatus data-date={date} data-total={total}>
   <div class="rs__line">
     <span class="rs__dot" data-dot></span>
     <strong class="rs__date" data-date-label>{label} 已更新</strong>
@@ -45,7 +44,6 @@ const label = `${Number(m)}月${Number(d)}日`;
   const root = document.querySelector('[data-runstatus]') as HTMLElement | null;
 
   if (root) {
-    const repo = root.dataset.repo || 'bowangzhijia/website';
     const dataDate = root.dataset.date || '';
     const dot = root.querySelector('[data-dot]') as HTMLElement;
     const state = root.querySelector('[data-state]') as HTMLElement;
@@ -96,12 +94,11 @@ const label = `${Number(m)}月${Number(d)}日`;
       skipped: '跳过',
     };
 
-    fetch(`https://api.github.com/repos/${repo}/actions/workflows/etf-share.yml/runs?per_page=5`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    })
+    // 走自己的代理接口：直接调 api.github.com 会把仓库名暴露在请求 URL 里
+    fetch('/api/runs')
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((j) => {
-        const runs = (j.workflow_runs || []) as any[];
+        const runs = (j.runs || []) as any[];
         if (!runs.length) {
           state.textContent = '还没有运行记录';
           return;
