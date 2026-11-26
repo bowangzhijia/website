@@ -20,8 +20,12 @@ interface Ctx {
   next: () => Promise<Response>;
 }
 
-/** 受保护的路径前缀 */
-const GUARDED = ['/columns/etf-share', '/data/etf-share'];
+/**
+ * 受保护的路径前缀。
+ * /write 是手机写作后台——没 token 提交不了，但让别人看到「写作工具 + GitHub 教程」
+ * 很像后台没锁，一起挡住。用的是同一套口令。
+ */
+const GUARDED = ['/columns/etf-share', '/data/etf-share', '/write'];
 
 /** 口令输入页：自包含，不依赖站点样式，加载快也不怕样式被改 */
 function unlockPage(): string {

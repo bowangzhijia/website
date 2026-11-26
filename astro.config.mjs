@@ -15,7 +15,12 @@ export default defineConfig({
   redirects: {
     '/etf-share': '/columns/etf-share/',
   },
-  integrations: [sitemap()],
+  integrations: [
+    sitemap({
+      // 写作后台不对外，别让搜索引擎收录
+      filter: (page) => !page.includes('/write/'),
+    }),
+  ],
   /*
    * 链接预取：页面加载后，把视口里出现的站内链接提前下载好。
    * 点栏目的时候页面已经在本地了，不用再等网络往返——
