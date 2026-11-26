@@ -576,6 +576,32 @@ function computeChanges(date) {
   return { prev: prevDate, rows };
 }
 
+/**
+ * 今天是否已经成功复核过。
+ *
+ * --refresh 的设计是「重抓一遍核对交易所有没有修正」，但早上 7/8/9 点连着触发
+ * 就会把同一份数据抓三四遍。深市要翻 55 页，密集请求很容易被限速
+ * （实测 7 点那次 fetch failed 就是这么来的）。
+ *
+ * 同一交易日成功复核过一次就够了：实测复核时数据几乎从不修正
+ * （11-23 那次 936 只逐只比对，全部一致）。
+ */
+function refreshedToday(today) {
+  const p = join(DATA_DIR, 'last-refresh.json');
+  if (!existsSync(p)) return false;
+  try {
+    // 去掉可能的 BOM：某些手动编辑/Windows 工具会把 \uFEFF 带到文件头
+    const raw = readFileSync(p, 'utf8').replace(/^\uFEFF/, '');
+    return JSON.parse(raw).runDate === today;
+  } catch {
+    return false;
+  }
+}
+
+function markRefreshed(today) {
+  writeIfChanged(join(DATA_DIR, 'last-refresh.json'), { runDate: today });
+}
+
 /** 宽基篮子配置（人工维护，交易所接口不给跟踪标的） */
 function loadBaskets() {
   const p = join(DATA_DIR, 'baskets.json');
@@ -1476,6 +1502,13 @@ async function main() {
     return;
   }
 
+  // 今天已经成功复核过就不再重抓：早上连着触发三四次，每次都翻 55 页深市，
+  // 纯浪费还可能触发限速。
+  if (args.refresh && refreshedToday(today)) {
+    console.log(`${today} 已经成功复核过，本次跳过`);
+    return;
+  }
+
   /*
    * 晚间首跑只看今天，不往前找。
    *
@@ -1509,6 +1542,8 @@ async function main() {
     if (snap) {
       if (args.article) generateArticle(d);
       await buildHistory();
+      // 复核成功后打个标记，同一天后面的几次触发直接跳过
+      if (args.refresh) markRefreshed(today);
       return;
     }
     await sleep(1000);
