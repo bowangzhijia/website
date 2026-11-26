@@ -169,8 +169,12 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                           <tr>
                             <th>代码</th>
                             <th>名称</th>
-                            <th class="r">净流入(亿元)</th>
-                            <th class="r">规模(亿元)</th>
+                            <th class="r">
+                              净流入<span class="u">(亿元)</span>
+                            </th>
+                            <th class="r">
+                              规模<span class="u">(亿元)</span>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -723,6 +727,13 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     .bk__tb th,
     .bk__tb td {
       padding: 5px 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 手机上藏掉单位，四列表头才塞得下（不藏会跟隔壁列叠在一起） */
+    .bk__tb .u {
+      display: none;
     }
 
     .bk__tb .nm {
