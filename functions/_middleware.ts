@@ -5,56 +5,23 @@
  *   /columns/etf-share/*  —— 页面本身
  *   /data/etf-share/*     —— 数据文件（不拦这个等于没锁，JSON 能直接下载）
  *
- * 口令存在环境变量 SITE_PASSWORD 里，不写进代码、不进 git。
- * 校验通过后种一个 HMAC 签名的 cookie，30 天内免输；
- * cookie 里存的是签名而不是口令本身，即使被看到也推不出密码。
+ * 判定逻辑在 _lib/auth.ts：cookie 带签发时间，每次请求按当前配置算是否过期，
+ * 所以调 SITE_UNLOCK_HOURS 之后，超期的旧 cookie 会立刻失效。
  *
  * 没配 SITE_PASSWORD 时**拒绝访问并提示**，而不是默默放行——
  * 否则会出现"以为锁上了其实完全公开"的情况，那种失误最难发现。
  */
 
-/**
- * 手写上下文类型，不引 @cloudflare/workers-types。
- * 那个包的版本号和项目里的 wrangler 3.x 有 peer 冲突，装上会让部署直接挂掉。
- */
+import { isUnlocked, type Env } from './_lib/auth';
+
 interface Ctx {
   request: Request;
-  env: { SITE_PASSWORD?: string };
+  env: Env;
   next: () => Promise<Response>;
 }
 
-const COOKIE = 'bw_unlock';
-
 /** 受保护的路径前缀 */
 const GUARDED = ['/columns/etf-share', '/data/etf-share'];
-
-const enc = new TextEncoder();
-
-function hex(buf: ArrayBuffer): string {
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/** 用口令做 HMAC，得到一个固定签名当 cookie 值 */
-async function signature(password: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(password),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode('bw-unlock-v1'));
-  return hex(sig);
-}
-
-function readCookie(req: Request, name: string): string | null {
-  const raw = req.headers.get('Cookie') || '';
-  for (const part of raw.split(';')) {
-    const [k, ...rest] = part.trim().split('=');
-    if (k === name) return rest.join('=');
-  }
-  return null;
-}
 
 /** 口令输入页：自包含，不依赖站点样式，加载快也不怕样式被改 */
 function unlockPage(): string {
@@ -78,16 +45,19 @@ function unlockPage(): string {
   button{width:100%;margin-top:12px;padding:11px;border:0;border-radius:9px;
          background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
+  .back{background:transparent;border:1px solid #22303c;color:#8b9aa8;font-weight:400;font-size:13px;padding:9px}
+  .back:hover{color:#e6edf3;border-color:#3b4a57}
   .err{min-height:20px;margin-top:10px;color:#f87171;font-size:13px}
 </style>
 </head>
 <body>
   <form class="box" id="f">
     <h1>这个栏目是私密的</h1>
-    <p>输入口令后可以查看，30 天内免输。</p>
+    <p>输入口令后可以查看。</p>
     <input id="p" type="password" autocomplete="current-password" placeholder="口令" autofocus>
     <button id="b" type="submit">进入</button>
     <div class="err" id="e"></div>
+    <button class="back" type="button" onclick="location.href='/'">返回首页</button>
   </form>
 <script>
   const f = document.getElementById('f'), p = document.getElementById('p'),
@@ -104,8 +74,7 @@ function unlockPage(): string {
         body: JSON.stringify({ password: v }),
       });
       if (r.ok) { location.reload(); return; }
-      const t = await r.text();
-      e.textContent = t || '口令不对';
+      e.textContent = '口令不对';
     } catch {
       e.textContent = '网络出错，稍后再试';
     }
@@ -127,19 +96,14 @@ export const onRequest = async (ctx: Ctx): Promise<Response> => {
   const guarded = GUARDED.some((g) => path === g || path.startsWith(g + '/'));
   if (!guarded) return ctx.next();
 
-  const pass = ctx.env.SITE_PASSWORD;
-  if (!pass) {
-    return new Response('未配置 SITE_PASSWORD 环境变量，栏目已锁定但无法解锁。请在 Cloudflare Pages 设置里添加。', {
-      status: 503,
-      headers: { 'content-type': 'text/plain; charset=utf-8' },
-    });
+  if (!ctx.env.SITE_PASSWORD) {
+    return new Response(
+      '未配置 SITE_PASSWORD 环境变量，栏目已锁定但无法解锁。请在 Cloudflare Pages 设置里添加。',
+      { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } }
+    );
   }
 
-  const token = readCookie(ctx.request, COOKIE);
-  if (token) {
-    const expect = await signature(pass);
-    if (token === expect) return ctx.next();
-  }
+  if (await isUnlocked(ctx.request, ctx.env)) return ctx.next();
 
   // 数据文件被前端 fetch，返回 HTML 会让 JSON 解析炸掉，所以这里给 401
   if (path.startsWith('/data/')) {
