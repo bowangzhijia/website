@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 /**
  * 验证口令并种 cookie。
  *
@@ -8,6 +7,12 @@
 
 interface Env {
   SITE_PASSWORD?: string;
+}
+
+/** 手写上下文类型，不引 @cloudflare/workers-types（会和 wrangler 3.x 的 peer 依赖打架） */
+interface Ctx {
+  request: Request;
+  env: Env;
 }
 
 const COOKIE = 'bw_unlock';
@@ -31,7 +36,7 @@ async function signature(password: string): Promise<string> {
   return hex(sig);
 }
 
-export const onRequestPost: PagesFunction<Env> = async (ctx) => {
+export const onRequestPost = async (ctx: Ctx): Promise<Response> => {
   const pass = ctx.env.SITE_PASSWORD;
   if (!pass) {
     return new Response('未配置 SITE_PASSWORD', { status: 503 });
@@ -61,7 +66,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 };
 
 /** 退出：清掉 cookie */
-export const onRequestDelete: PagesFunction<Env> = async () =>
+export const onRequestDelete = async (): Promise<Response> =>
   new Response(null, {
     status: 204,
     headers: { 'Set-Cookie': `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` },

@@ -1,4 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
 /**
  * 给「ETF份额」栏目加一道口令门。
  *
@@ -14,8 +13,14 @@
  * 否则会出现"以为锁上了其实完全公开"的情况，那种失误最难发现。
  */
 
-interface Env {
-  SITE_PASSWORD?: string;
+/**
+ * 手写上下文类型，不引 @cloudflare/workers-types。
+ * 那个包的版本号和项目里的 wrangler 3.x 有 peer 冲突，装上会让部署直接挂掉。
+ */
+interface Ctx {
+  request: Request;
+  env: { SITE_PASSWORD?: string };
+  next: () => Promise<Response>;
 }
 
 const COOKIE = 'bw_unlock';
@@ -113,7 +118,7 @@ function unlockPage(): string {
 </html>`;
 }
 
-export const onRequest: PagesFunction<Env> = async (ctx) => {
+export const onRequest = async (ctx: Ctx): Promise<Response> => {
   const url = new URL(ctx.request.url);
   const path = url.pathname;
 
