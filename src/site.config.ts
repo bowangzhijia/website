@@ -60,6 +60,14 @@ export type Column = {
   kind?: 'platforms' | 'message' | 'feed';
   /** 该栏目页的欢迎语，不填用默认的 WELCOME */
   welcome?: { title: string; body: string };
+
+  /**
+   * 私密栏目：不出现在导航、首页、底栏、搜索和 sitemap 里。
+   *
+   * 注意这只解决「不被发现」，真正拦住访问要靠 Cloudflare Access
+   * （否则知道网址的人照样能进，数据文件更是直接可下载）。
+   */
+  private?: boolean;
 };
 
 export const COLUMNS: Column[] = [
@@ -101,6 +109,7 @@ export const COLUMNS: Column[] = [
     desc: '按指数追踪沪深两市 ETF 份额变化，看主力资金是真申购还是假热闹。',
     color: ['#0ea5e9', '#7dd3fc'],
     kind: 'feed',
+    private: true,
   },
   {
     id: 'chahuahui',
@@ -122,6 +131,14 @@ export const COLUMNS: Column[] = [
     },
   },
 ];
+
+/**
+ * 对外展示的栏目：导航、底栏、首页卡片都用这个，私密栏目自动隐身。
+ * 页面本身仍然生成（/columns/etf-share/），只是没有入口指向它。
+ */
+export function visibleColumns(): Column[] {
+  return COLUMNS.filter((c) => !c.private);
+}
 
 /**
  * ============================================================

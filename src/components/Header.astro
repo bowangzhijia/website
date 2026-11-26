@@ -1,11 +1,11 @@
 ---
-import { SITE, COLUMNS } from '../site.config';
+import { SITE, visibleColumns } from '../site.config';
 
 const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
 const items = [
   { label: '首页', href: '/', active: path === '/' },
-  ...COLUMNS.map((column) => {
+  ...visibleColumns().map((column) => {
     const href = `/columns/${column.id}/`;
     return {
       label: column.name,

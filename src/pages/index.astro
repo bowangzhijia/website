@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SubscribeForm from '../components/SubscribeForm.astro';
-import { SITE, COLUMNS, WELCOME, RISK_NOTE } from '../site.config';
+import { SITE, visibleColumns, WELCOME, RISK_NOTE } from '../site.config';
 
 const pageTitle = SITE.tagline;
 ---
@@ -29,7 +29,7 @@ const pageTitle = SITE.tagline;
 
       <nav class="home__cols" aria-label="栏目入口">
         {
-          COLUMNS.map((column, index) => (
+          visibleColumns().map((column, index) => (
             <a
               class="entry"
               href={`/columns/${column.id}/`}

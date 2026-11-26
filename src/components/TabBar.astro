@@ -8,7 +8,7 @@
  * 注意：不能放进 Header.astro——顶栏有 backdrop-filter，
  * 会给 position:fixed 的子孙元素另建包含块，底栏就会跑位。
  */
-import { COLUMNS } from '../site.config';
+import { visibleColumns } from '../site.config';
 
 const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
@@ -40,7 +40,7 @@ const ICONS: Record<string, string> = {
 
 const tabs = [
   { key: 'home', label: '首页', href: '/', active: path === '/' },
-  ...COLUMNS.map((column) => {
+  ...visibleColumns().map((column) => {
     const base = `/columns/${column.id}`;
     return {
       key: ICONS[column.id] ? column.id : 'dot',
