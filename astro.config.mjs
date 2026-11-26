@@ -6,6 +6,15 @@ export default defineConfig({
   site: SITE.url,
   output: 'static',
   trailingSlash: 'always',
+  /*
+   * 老的独立地址保留跳转，不做 404。
+   * 这个页面和栏目页内容完全一样，留两个入口只会多一处要保护的地方；
+   * 但直接删掉会让收藏过旧链接的人看到打不开——所以改成跳转，
+   * 跳转页没有内容，真正的内容只有栏目页一个入口。
+   */
+  redirects: {
+    '/etf-share': '/columns/etf-share/',
+  },
   integrations: [
     sitemap({
       // 私密栏目不进 sitemap，避免被搜索引擎收录
