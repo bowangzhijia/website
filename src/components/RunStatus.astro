@@ -12,20 +12,23 @@
 interface Props {
   /** 当前页面数据对应的日期，比如 2026-11-25 */
   date: string;
+  /** 采集到的 ETF 只数，用来判断沪深是不是都齐了 */
+  total?: number;
   repo?: string;
 }
 
-const { date, repo = 'bowangzhijia/website' } = Astro.props;
+const { date, total = 0, repo = 'bowangzhijia/website' } = Astro.props;
 
 /** 2026-11-25 → 11月25日 */
-const [y, m, d] = date.split('-');
+const [, m, d] = date.split('-');
 const label = `${Number(m)}月${Number(d)}日`;
 ---
 
-<section class="rs" data-runstatus data-repo={repo}>
+<section class="rs" data-runstatus data-repo={repo} data-date={date} data-total={total}>
   <div class="rs__line">
     <span class="rs__dot" data-dot></span>
-    <strong class="rs__date">数据更新至 {label}</strong>
+    <strong class="rs__date" data-date-label>数据更新至 {label}</strong>
+    {total > 0 && <span class="rs__count">{total} 只</span>}
     <span class="rs__sep">·</span>
     <span class="rs__state" data-state>正在检查抓取状态…</span>
     <button class="rs__toggle" type="button" data-toggle aria-expanded="false">最近运行</button>
@@ -43,10 +46,33 @@ const label = `${Number(m)}月${Number(d)}日`;
 
   if (root) {
     const repo = root.dataset.repo || 'bowangzhijia/website';
+    const dataDate = root.dataset.date || '';
     const dot = root.querySelector('[data-dot]') as HTMLElement;
     const state = root.querySelector('[data-state]') as HTMLElement;
     const list = root.querySelector('[data-list]') as HTMLElement;
     const toggle = root.querySelector('[data-toggle]') as HTMLButtonElement;
+    const dateLabel = root.querySelector('[data-date-label]') as HTMLElement | null;
+
+    /**
+     * 数据日期是不是「今天」。
+     * 是的话直接说「今日数据已就绪」——这是读者最想确认的一句话，
+     * 不然还得自己拿今天的日期去跟「更新至 X 日」比对。
+     * 用前端算今天（而不是构建时），隔天打开也不会说错。
+     */
+    const bjToday = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+    const fmtDate = (s: string) => {
+      const parts = s.split('-');
+      return `${Number(parts[1])}月${Number(parts[2])}日`;
+    };
+
+    if (dateLabel && dataDate) {
+      if (dataDate === bjToday()) {
+        dateLabel.textContent = `今日（${fmtDate(dataDate)}）数据已就绪`;
+        dateLabel.classList.add('is-ready');
+      } else {
+        dateLabel.textContent = `数据更新至 ${fmtDate(dataDate)}`;
+      }
+    }
 
     /** UTC → 北京时间 MM-DD HH:mm */
     const fmt = (iso: string) => {
@@ -185,6 +211,19 @@ const label = `${Number(m)}月${Number(d)}日`;
   .rs__date {
     color: var(--text);
     font-weight: 600;
+  }
+
+  /* 当天数据已就绪：用绿色点一下题 */
+  .rs__date.is-ready {
+    color: var(--down);
+  }
+
+  .rs__count {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--chip-fill, rgba(0, 0, 0, 0.04));
+    color: var(--muted);
+    font-size: 11px;
   }
 
   .rs__sep {
