@@ -32,7 +32,11 @@ export const onRequestGet = async (): Promise<Response> => {
           Accept: 'application/vnd.github+json',
           'User-Agent': 'bw-runstatus-proxy',
         },
-      }
+        // 让 Cloudflare 边缘把上游响应缓存住。
+        // 匿名调 GitHub API 是 60 次/小时/IP，而 Cloudflare 的出口 IP 是共享的，
+        // 不缓存的话很快就打满，返回空数组。
+        cf: { cacheTtl: 180, cacheEverything: true },
+      } as any
     );
 
     if (!r.ok) {
