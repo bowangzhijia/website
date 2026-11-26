@@ -27,7 +27,7 @@ const label = `${Number(m)}月${Number(d)}日`;
 <section class="rs" data-runstatus data-repo={repo} data-date={date} data-total={total}>
   <div class="rs__line">
     <span class="rs__dot" data-dot></span>
-    <strong class="rs__date" data-date-label>数据更新至 {label}</strong>
+    <strong class="rs__date" data-date-label>{label} 已更新</strong>
     {total > 0 && <span class="rs__count">{total} 只</span>}
     <span class="rs__sep">·</span>
     <span class="rs__state" data-state>正在检查抓取状态…</span>
@@ -66,12 +66,14 @@ const label = `${Number(m)}月${Number(d)}日`;
     };
 
     if (dateLabel && dataDate) {
-      if (dataDate === bjToday()) {
-        dateLabel.textContent = `今日（${fmtDate(dataDate)}）数据已就绪`;
-        dateLabel.classList.add('is-ready');
-      } else {
-        dateLabel.textContent = `数据更新至 ${fmtDate(dataDate)}`;
-      }
+      const today = bjToday();
+      // 周末不开市，不该说「今天待更新」
+      const weekend = [0, 6].includes(new Date(today + 'T00:00:00Z').getUTCDay());
+      const pending = dataDate < today && !weekend;
+
+      dateLabel.innerHTML =
+        `<span class="rs__done">${fmtDate(dataDate)} 已更新</span>` +
+        (pending ? `<span class="rs__pending">${fmtDate(today)} 待更新</span>` : '');
     }
 
     /** UTC → 北京时间 MM-DD HH:mm */
@@ -209,14 +211,30 @@ const label = `${Number(m)}月${Number(d)}日`;
   }
 
   .rs__date {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     color: var(--text);
     font-weight: 600;
   }
 
-  /* 当天数据已就绪：用绿色点一下题 */
-  .rs__date.is-ready {
+  /* 已更新：绿色实心；待更新：橙色描边，一眼区分「有」和「还没」 */
+  .rs__done {
     color: var(--down);
   }
+
+  .rs__pending {
+    padding: 1px 7px;
+    border: 1px solid color-mix(in srgb, var(--ma30) 45%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ma30) 8%, transparent);
+    color: var(--ma30);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+
 
   .rs__count {
     padding: 1px 6px;
