@@ -169,19 +169,19 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                           <tr>
                             <th>代码</th>
                             <th>名称</th>
-                            <th class="r">规模(亿元)</th>
                             <th class="r">净流入(亿元)</th>
+                            <th class="r">规模(亿元)</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(b.members || []).map((m: any) => (
                             <tr>
                               <td class="code">{m.c}</td>
-                              <td>{m.n}</td>
-                              <td class="r">{m.s.toFixed(2)}</td>
-                              <td class={`r ${m.amt > 0 ? 'up' : m.amt < 0 ? 'down' : 'dim'}`}>
+                              <td class="nm">{m.n}</td>
+                              <td class={`r amt ${m.amt > 0 ? 'up' : m.amt < 0 ? 'down' : 'dim'}`}>
                                 {m.amt === 0 ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
                               </td>
+                              <td class="r dim">{m.s.toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -519,6 +519,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     font-variant-numeric: tabular-nums;
   }
 
+  /* 净流入是排序依据，加粗一点和规模区分开 */
+  .bk__tb .amt {
+    font-weight: 700;
+  }
+
   .bk__tb .code {
     font-family: var(--font-mono);
     color: var(--text-dim);
@@ -684,13 +689,46 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       font-size: 20px;
     }
 
+    /* 手机上不用横向滑动：固定表格布局 + 按比例分列，名称过长就省略 */
+    .bk__tbwrap {
+      overflow-x: visible;
+    }
+
     .bk__tb {
-      font-size: 12px;
+      min-width: 0;
+      table-layout: fixed;
+      font-size: 11.5px;
+    }
+
+    .bk__tb th:nth-child(1),
+    .bk__tb td:nth-child(1) {
+      width: 21%;
+    }
+
+    .bk__tb th:nth-child(2),
+    .bk__tb td:nth-child(2) {
+      width: 37%;
+    }
+
+    .bk__tb th:nth-child(3),
+    .bk__tb td:nth-child(3) {
+      width: 23%;
+    }
+
+    .bk__tb th:nth-child(4),
+    .bk__tb td:nth-child(4) {
+      width: 19%;
     }
 
     .bk__tb th,
     .bk__tb td {
-      padding: 6px 8px;
+      padding: 5px 4px;
+    }
+
+    .bk__tb .nm {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .bk__foot {
