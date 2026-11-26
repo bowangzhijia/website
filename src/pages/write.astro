@@ -8,8 +8,8 @@ const defaultColumn = targets[0]?.id ?? 'redian';
 ---
 
 <BaseLayout title="写作台" description="发布新文章" noindex>
-  <!-- ---------- 门禁 ---------- -->
-  <div class="lock" data-lock>
+  <!-- ---------- 门禁（已停用，锁定由服务器层中间件负责） ---------- -->
+  <div class="lock" data-lock hidden>
     <div class="wrap lock__inner">
       <p class="lock__title">请输入英文名</p>
       <input
@@ -531,15 +531,19 @@ const defaultColumn = targets[0]?.id ?? 'redian';
       lockInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') submitLock();
       });
-      if (window.BowangAuth && window.BowangAuth.unlocked()) showApp();
+      // 口令门已经由 functions/_middleware.ts 在服务器层把住了，
+      // 这里不再叠一层英文名验证——两层只会让人输两次，而前端校验本来就能绕。
+      showApp();
     }
 
     var signoutBtn = $('[data-signout]');
     if (signoutBtn) {
       signoutBtn.addEventListener('click', function () {
-        if (!confirm('退出后，这台设备下次进入需要重新填英文名。确定吗？')) return;
-        if (window.BowangAuth) window.BowangAuth.lock();
-        location.href = '/';
+        if (!confirm('退出后，这台设备下次进入需要重新输口令。确定吗？')) return;
+        // 让服务端清掉口令 cookie，否则"退出"只是跳回首页，下次还是直接进
+        fetch('/api/unlock', { method: 'DELETE' }).finally(function () {
+          location.href = '/';
+        });
       });
     }
 
