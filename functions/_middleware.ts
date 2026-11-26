@@ -122,8 +122,8 @@ export const onRequest = async (ctx: Ctx): Promise<Response> => {
   const url = new URL(ctx.request.url);
   const path = url.pathname;
 
-  // 解锁接口自己要能访问，否则永远进不来
-  if (path === '/api/unlock') return ctx.next();
+  // 解锁和状态查询接口自己要能访问，否则永远进不来
+  if (path === '/api/unlock' || path === '/api/status') return ctx.next();
 
   const guarded = GUARDED.some((g) => path === g || path.startsWith(g + '/'));
   if (!guarded) return ctx.next();

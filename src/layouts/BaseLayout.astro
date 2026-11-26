@@ -146,6 +146,115 @@ const jsonLd = {
         });
       });
     </script>
+
+    <!--
+      私密栏目口令弹窗。
+      点「ETF份额」时不再整页跳走，而是在当前页弹框——
+      否则用户一点栏目，整个网站的导航和别人能看的内容都没了。
+      直接输网址访问仍然会落到整页口令页（那是兜底），这里只管点击入口。
+    -->
+    <script is:inline>
+      (function () {
+        var PATTERN = '/columns/etf-share';
+        var shown = false;
+
+        function buildModal(target) {
+          var wrap = document.createElement('div');
+          wrap.className = 'lockmodal';
+          wrap.innerHTML =
+            '<div class="lockmodal__box" role="dialog" aria-modal="true" aria-labelledby="lockmodal-t">' +
+            '<h2 class="lockmodal__t" id="lockmodal-t">这个栏目是私密的</h2>' +
+            '<p class="lockmodal__d">输入口令后可以查看，30 天内免输。</p>' +
+            '<input class="lockmodal__i" type="password" placeholder="口令" autocomplete="current-password">' +
+            '<div class="lockmodal__err"></div>' +
+            '<button class="lockmodal__ok" type="button">进入</button>' +
+            '<button class="lockmodal__back" type="button">返回</button>' +
+            '</div>';
+          document.body.appendChild(wrap);
+
+          var box = wrap.querySelector('.lockmodal__box');
+          var input = wrap.querySelector('.lockmodal__i');
+          var err = wrap.querySelector('.lockmodal__err');
+          var ok = wrap.querySelector('.lockmodal__ok');
+          var back = wrap.querySelector('.lockmodal__back');
+
+          function close() {
+            if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+            shown = false;
+            document.documentElement.style.overflow = '';
+          }
+
+          // 点遮罩（弹窗外面）就关掉
+          wrap.addEventListener('click', function (e) {
+            if (!box.contains(e.target)) close();
+          });
+          back.addEventListener('click', close);
+          document.addEventListener('keydown', function esc(e) {
+            if (!wrap.parentNode) {
+              document.removeEventListener('keydown', esc);
+              return;
+            }
+            if (e.key === 'Escape') close();
+          });
+
+          async function submit() {
+            var v = input.value.trim();
+            if (!v) return;
+            ok.disabled = true;
+            err.textContent = '';
+            try {
+              var r = await fetch('/api/unlock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: v }),
+              });
+              if (r.ok) {
+                location.href = target;
+                return;
+              }
+              err.textContent = '口令不对';
+            } catch (e) {
+              err.textContent = '网络出错，稍后再试';
+            }
+            ok.disabled = false;
+            input.select();
+          }
+
+          ok.addEventListener('click', submit);
+          input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') submit();
+          });
+
+          document.documentElement.style.overflow = 'hidden';
+          setTimeout(function () {
+            input.focus();
+          }, 60);
+          shown = true;
+        }
+
+        document.addEventListener('click', async function (e) {
+          var a = e.target.closest ? e.target.closest('a') : null;
+          if (!a || !a.getAttribute('href')) return;
+          if (a.getAttribute('href').indexOf(PATTERN) === -1) return;
+
+          e.preventDefault();
+          if (shown) return;
+
+          // 解过锁就直接进，不打扰
+          try {
+            var r = await fetch('/api/status');
+            var j = await r.json();
+            if (j && j.unlocked) {
+              location.href = a.href;
+              return;
+            }
+          } catch (err) {
+            /* 查询失败就当没解锁，弹框兜住 */
+          }
+          buildModal(a.href);
+        });
+      })();
+    </script>
   </body>
 </html>
 
@@ -154,5 +263,106 @@ const jsonLd = {
   html:not(.js-ready) .reveal {
     opacity: 1;
     transform: none;
+  }
+
+  /* ===== 私密栏目口令弹窗 ===== */
+  .lockmodal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    animation: lockmodal-in 0.16s ease;
+  }
+
+  @keyframes lockmodal-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .lockmodal__box {
+    width: min(92vw, 330px);
+    padding: 24px 22px 18px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+  }
+
+  .lockmodal__t {
+    margin: 0 0 6px;
+    font-size: 17px;
+    color: var(--text);
+  }
+
+  .lockmodal__d {
+    margin: 0 0 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .lockmodal__i {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    font-family: var(--font);
+    outline: none;
+  }
+
+  .lockmodal__i:focus {
+    border-color: var(--accent-border);
+  }
+
+  .lockmodal__err {
+    min-height: 18px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--up);
+  }
+
+  .lockmodal__ok {
+    width: 100%;
+    padding: 10px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+  }
+
+  .lockmodal__ok:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .lockmodal__back {
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font);
+    cursor: pointer;
+  }
+
+  .lockmodal__back:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
   }
 </style>
