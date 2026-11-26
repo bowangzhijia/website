@@ -693,7 +693,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       font-size: 20px;
     }
 
-    /* 手机上不用横向滑动：固定表格布局 + 按比例分列，名称过长就省略 */
+    /* 手机上不用横向滑动：靠缩小字号 + 固定布局，把四列完整塞进一屏 */
     .bk__tbwrap {
       overflow-x: visible;
     }
@@ -701,39 +701,37 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     .bk__tb {
       min-width: 0;
       table-layout: fixed;
-      font-size: 11.5px;
+      font-size: 10.5px;
     }
 
     .bk__tb th:nth-child(1),
     .bk__tb td:nth-child(1) {
-      width: 21%;
+      width: 19%;
     }
 
     .bk__tb th:nth-child(2),
     .bk__tb td:nth-child(2) {
-      width: 37%;
+      width: 31%;
     }
 
     .bk__tb th:nth-child(3),
     .bk__tb td:nth-child(3) {
-      width: 23%;
+      width: 28%;
     }
 
     .bk__tb th:nth-child(4),
     .bk__tb td:nth-child(4) {
-      width: 19%;
+      width: 22%;
     }
 
     .bk__tb th,
     .bk__tb td {
-      padding: 5px 4px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      padding: 5px 3px;
     }
 
-    /* 手机上藏掉单位，四列表头才塞得下（不藏会跟隔壁列叠在一起） */
-    .bk__tb .u {
-      display: none;
+    .bk__tb th {
+      font-size: 10px;
+      letter-spacing: -0.02em;
     }
 
     .bk__tb .nm {
