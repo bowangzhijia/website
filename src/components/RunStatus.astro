@@ -326,12 +326,26 @@ const label = `${Number(m)}月${Number(d)}日`;
   }
 
   @media (max-width: 560px) {
+    .rs {
+      padding: 8px 11px;
+    }
+
     .rs__line {
       font-size: 12px;
+      gap: 5px;
+    }
+
+    .rs__date {
+      gap: 6px;
     }
 
     .rs__toggle {
       margin-left: 0;
+    }
+
+    /* 只数是次要信息，窄屏先让位，免得挤成三行 */
+    .rs__count {
+      display: none;
     }
   }
 </style>

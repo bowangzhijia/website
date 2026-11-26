@@ -648,6 +648,36 @@ const baskets: any[] = data?.baskets ?? [];
       height: 320px;
     }
   }
+
+  /* 手机竖屏：周期和均线按钮一共 8 个，不缩小会挤成三行 */
+  @media (max-width: 560px) {
+    .fc__canvas {
+      height: 280px;
+    }
+
+    .fc__periods {
+      gap: 3px;
+    }
+
+    .fc__period {
+      min-width: 0;
+      padding: 4px 7px;
+      font-size: 11px;
+    }
+
+    .fc__divider {
+      margin: 0 2px;
+    }
+
+    .fc__legend {
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .fc__sub {
+      font-size: 12px;
+    }
+  }
 </style>
 
 <style is:global>

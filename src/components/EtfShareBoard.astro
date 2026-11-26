@@ -162,28 +162,31 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         <span class="bk__more">点开看成分</span>
                       </div>
                     </summary>
-                    <table class="bk__tb">
-                      <thead>
-                        <tr>
-                          <th>代码</th>
-                          <th>名称</th>
-                          <th class="r">规模(亿元)</th>
-                          <th class="r">净流入(亿元)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(b.members || []).map((m: any) => (
+                    {/* 手机屏幕窄，四列放不下，套一层横向滚动而不是让它顶出卡片 */}
+                    <div class="bk__tbwrap">
+                      <table class="bk__tb">
+                        <thead>
                           <tr>
-                            <td class="code">{m.c}</td>
-                            <td>{m.n}</td>
-                            <td class="r">{m.s.toFixed(2)}</td>
-                            <td class={`r ${m.amt > 0 ? 'up' : m.amt < 0 ? 'down' : 'dim'}`}>
-                              {m.amt === 0 ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
-                            </td>
+                            <th>代码</th>
+                            <th>名称</th>
+                            <th class="r">规模(亿元)</th>
+                            <th class="r">净流入(亿元)</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {(b.members || []).map((m: any) => (
+                            <tr>
+                              <td class="code">{m.c}</td>
+                              <td>{m.n}</td>
+                              <td class="r">{m.s.toFixed(2)}</td>
+                              <td class={`r ${m.amt > 0 ? 'up' : m.amt < 0 ? 'down' : 'dim'}`}>
+                                {m.amt === 0 ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </details>
                 ))}
               </div>
@@ -478,9 +481,16 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     color: var(--accent);
   }
 
+  /* 成分表在手机上放不下，横向滚动；min-width 保证列不被挤成一条 */
+  .bk__tbwrap {
+    margin-top: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .bk__tb {
     width: 100%;
-    margin-top: 12px;
+    min-width: 420px;
     border-collapse: collapse;
     font-size: 13px;
   }
@@ -645,6 +655,46 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
     .sc__title {
       font-size: 22px;
+    }
+  }
+
+  /* 手机竖屏：卡片和数字都缩一档，否则四列统计挤成豆腐块 */
+  @media (max-width: 560px) {
+    .stat {
+      padding: 11px 13px;
+    }
+
+    .stat__k {
+      font-size: 11px;
+    }
+
+    .stat__v {
+      font-size: 19px;
+    }
+
+    .bk__card {
+      padding: 12px 13px;
+    }
+
+    .bk__name {
+      font-size: 13px;
+    }
+
+    .bk__v {
+      font-size: 20px;
+    }
+
+    .bk__tb {
+      font-size: 12px;
+    }
+
+    .bk__tb th,
+    .bk__tb td {
+      padding: 6px 8px;
+    }
+
+    .bk__foot {
+      font-size: 12px;
     }
   }
 </style>
