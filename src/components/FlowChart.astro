@@ -327,8 +327,12 @@ const baskets: any[] = data?.baskets ?? [];
           backgroundColor: 'transparent',
           axisPointer: { link: [{ xAxisIndex: 'all' }] },
           tooltip: {
-            // 手机上关掉浮层——不管放哪都会压住 K 线，改用图表下方的信息条
-            show: window.innerWidth > 760,
+            /*
+             * 手机上不能直接 show:false —— 那样 axisPointer 的竖线光标也跟着没了。
+             * 改成「链路保留、浮框隐形」：浮框内容照常生成但用 visibility 藏起来，
+             * 竖线正常跟随手指，读数由图表下方那条信息显示。
+             */
+            show: true,
             trigger: 'axis',
             /*
              * confine：把提示框限制在图表区域内。
@@ -338,7 +342,9 @@ const baskets: any[] = data?.baskets ?? [];
              */
             confine: true,
             extraCssText:
-              'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);',
+              window.innerWidth > 760
+                ? 'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);'
+                : 'visibility: hidden; padding: 0; border: 0;',
             /*
              * 手机上固定贴在图表顶部居中。
              * 默认跟着手指走，K 线密的时候框正好把手正在看的那段盖住；
@@ -352,12 +358,10 @@ const baskets: any[] = data?.baskets ?? [];
               return [Math.max(6, (vw - cw) / 2), 6];
             },
             axisPointer: {
-              type: 'cross',
+              // 手机上只要一条竖线，跟着点的地方走；桌面保留十字线
+              type: window.innerWidth > 760 ? 'cross' : 'line',
               crossStyle: { color: muted },
-              /*
-               * 十字线保留（看位置有用），但坐标标签在手机上关掉。
-               * 那个蓝底白字的日期框会直接压在 K 线上，是遮挡的另一半来源。
-               */
+              lineStyle: { color: muted, width: 1, type: 'dashed' },
               label: { show: window.innerWidth > 760 },
             },
             backgroundColor: css('--surface', '#fff'),
