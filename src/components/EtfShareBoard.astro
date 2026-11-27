@@ -1,6 +1,7 @@
 ---
 import ShareTable from './ShareTable.astro';
 import FlowChart from './FlowChart.astro';
+import FlowTable from './FlowTable.astro';
 import RunStatus from './RunStatus.astro';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -138,6 +139,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           </div>
 
           {history && <FlowChart data={history} />}
+          {history && <FlowTable />}
 
           {baskets.length > 0 && (
             <section class="bk">
