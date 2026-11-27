@@ -85,6 +85,19 @@ const tabs = [
     display: none;
   }
 
+  /*
+   * 收起顶部导航时，底栏一起藏起来 —— 手机上就是「全屏」。
+   * 录视频时不希望上下都有东西挡着，一个按钮同时管两处。
+   * --tabbar-h 归零是为了让页面底部留白跟着消失。
+   */
+  :global(html.nav-folded) {
+    --tabbar-h: 0px;
+  }
+
+  :global(html.nav-folded) .tabs {
+    display: none !important;
+  }
+
   @media (max-width: 760px) {
     .tabs {
       position: fixed;

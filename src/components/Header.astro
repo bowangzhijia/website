@@ -170,6 +170,14 @@ const items = [
     color: var(--muted);
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+    /* 录视频时不希望它太抢眼，平时淡着，摸到才实 */
+    opacity: 0.3;
+    transition: opacity 0.2s ease;
+  }
+
+  .hd__unfold:hover,
+  .hd__unfold:active {
+    opacity: 1;
   }
 
   :global(html.nav-folded) .hd__unfold {
