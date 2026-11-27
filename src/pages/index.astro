@@ -266,4 +266,48 @@ const pageTitle = SITE.tagline;
       margin-top: 14px;
     }
   }
+
+  /*
+   * 手机横屏：高度只有三百多，首页那一长条会滚到没完。
+   * 宽度反而富裕，改成两列，一屏能看到更多入口。
+   */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .home {
+      padding: 12px 0;
+    }
+
+    .home__mark {
+      width: 34px;
+      height: 34px;
+      margin-bottom: 8px;
+    }
+
+    .home__title {
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+
+    .home__sub {
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .home__cols {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .entry {
+      padding: 11px 14px;
+    }
+
+    .entry__name {
+      font-size: 14px;
+    }
+
+    .home__risk {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+  }
 </style>

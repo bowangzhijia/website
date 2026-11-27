@@ -992,6 +992,31 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     .stat__v {
       font-size: 15px;
     }
+
+    /* 横屏宽度够，篮子卡片可以摆三列，别浪费横向空间 */
+    .bk__grid {
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    }
+
+    .bk__card {
+      padding: 11px 12px;
+    }
+
+    /* 表格字号回到正常值：横屏宽度足够，不用再缩到 10px */
+    .bk__tb,
+    .an__tb,
+    .ft__tb,
+    .sr__table {
+      font-size: 12px;
+    }
+
+    .bk__tb {
+      min-width: 0;
+    }
+
+    .sr {
+      margin-bottom: 18px;
+    }
   }
 </style>
 

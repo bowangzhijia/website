@@ -368,6 +368,27 @@
     color: var(--muted);
   }
 
+  /* 手机横屏：宽度富余、高度紧张，压缩行高让表格一屏多看几行 */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .ft {
+      margin-top: 12px;
+      padding: 11px 13px;
+    }
+
+    .ft__head {
+      margin-bottom: 8px;
+    }
+
+    .ft__tb th,
+    .ft__tb td {
+      padding: 4px 8px;
+    }
+
+    .ft__note {
+      display: none;
+    }
+  }
+
   @media (max-width: 560px) {
     .ft {
       padding: 12px 13px;

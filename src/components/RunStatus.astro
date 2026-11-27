@@ -325,6 +325,23 @@ const label = `${Number(m)}月${Number(d)}日`;
     color: var(--muted);
   }
 
+  /* 手机横屏：高度紧张，状态条压成一行薄片 */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .rs {
+      margin-bottom: 8px;
+      padding: 6px 11px;
+    }
+
+    .rs__line {
+      font-size: 12px;
+      gap: 5px;
+    }
+
+    .rs__count {
+      display: none;
+    }
+  }
+
   @media (max-width: 560px) {
     .rs {
       padding: 8px 11px;
