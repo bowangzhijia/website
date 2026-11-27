@@ -511,6 +511,22 @@ async function collectDay(date) {
   }
   console.log(`   补价格：${priced}/${snap.items.length} 只`);
 
+  /*
+   * 防止「残缺覆盖完整」。
+   *
+   * 深市接口夜间经常挂掉（主源 0 条、备源也拉不到），这时只靠沪市也能过闸门
+   * （partial 模式）。如果这一天之前已经存过完整快照，再让这份只有沪市的
+   * 数据写进去，就等于把 1720 只砍成 938 只——页面上深市会集体消失。
+   * 已有更完整的，就直接沿用旧的。
+   */
+  const prevSnap = loadSnapshot(date);
+  if (snap.partial && prevSnap && !prevSnap.partial && prevSnap.items.length > snap.items.length) {
+    console.warn(
+      `   已有完整快照（${prevSnap.items.length} 只），本次只有 ${snap.items.length} 只（深市没抓到），保留旧的`
+    );
+    return prevSnap;
+  }
+
   saveSnapshot(snap);
   pruneOldSnapshots();
   console.log(`   ✔ 已存 ${snapshotPath(date)}`);
