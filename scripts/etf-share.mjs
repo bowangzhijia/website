@@ -936,14 +936,14 @@ function writeLatest(date, { prev, rows }, dates) {
       })),
     })),
     /*
-     * 份额异动清单：份额单日变化 ≥11% 的全部列出来，供人工核对。
+     * 份额异动清单：只盯宽基篮子里的成分，份额单日变化 ≥11% 的列出来供人工核对。
      *
-     * 为什么单独列：11% 这条线上下最容易混淆——可能是一次大额申购，也可能是
-     * 份额折算。自动判断只能给个倾向（sp=1 表示判成折算），真正对不对得看公告。
-     * 把可疑的都摆出来，比让程序自己拍板更可靠。
+     * 为什么不看全市场：行业主题、跨境、新发 ETF 的份额本来就会大起大落
+     * （建仓、巨额申赎），天天上榜反而盖住真正要看的那几只。
+     * 宽基大额异动才值得逐个查公告。
      */
     anomalies: rows
-      .filter((r) => Math.abs(r.deltaPct) >= 11)
+      .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
       .map((r) => ({
         c: r.code,
         n: r.name,
@@ -1049,14 +1049,32 @@ async function fetchIndexKline(secid, days = 90) {
       : [[shiftDate(beijingToday(), -Number(days) * 2).replace(/-/g, ''), today]];
 
   const out = [];
+  let failed = 0;
   for (const [beg, end] of segs) {
     const url =
       'https://push2his.eastmoney.com/api/qt/stock/kline/get' +
       `?secid=${secid}&klt=101&fqt=1&beg=${beg}&end=${end}` +
       '&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57';
-    const j = await fetchJson(url, H_EM, `K线 ${secid} ${beg}`, 3);
+    const j = await fetchJson(url, H_EM, `K线 ${secid} ${beg}`, 4);
+
+    /*
+     * 某一段被抓挂时不能静默跳过。
+     *
+     * 踩过的坑：这段原来写的是 out.push(...parse(j))，j 为 null 时 push 空数组，
+     * 一声不响地少一段。结果"全历史"变成了只剩 1991-2000 那 2400 根，
+     * 页面上 K 线直接退回三十年前——看起来像数据丢了，其实是覆盖了。
+     */
+    if (!j?.data?.klines?.length) {
+      failed++;
+      console.warn(`   ⚠ K 线 ${beg}-${end} 段没抓到`);
+      continue;
+    }
     out.push(...parse(j));
-    if (segs.length > 1) await sleep(250);
+    if (segs.length > 1) await sleep(700);
+  }
+
+  if (failed) {
+    console.warn(`   ⚠ K 线共 ${segs.length} 段，${failed} 段失败，返回 ${out.length} 根（不完整）`);
   }
   return out;
 }
@@ -1415,11 +1433,25 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
   const sh = skipKline ? [] : await fetchIndexKline('1.000001', 'all');
   let klineDates;
   let klineArr;
-  if (sh.length) {
+
+  /*
+   * 完整性检查（很重要）。
+   *
+   * 踩过的坑：拉全历史是分段的，中途某一段失败时函数会返回「只抓到的那几段」，
+   * 而调用方如果直接拿去覆盖，历史就被从 8700 根砍成 2400 根——
+   * 页面上K线直接变成 1991-2000 年，看起来像"数据丢了"，实际是覆盖了。
+   *
+   * 上证指数 1990 年至今有 8600 多根，正常全量抓不会低于 7500 根。
+   * 低于这个数的，一律当作没抓全。
+   */
+  const COMPLETE_BARS = 7500;
+  if (sh.length >= COMPLETE_BARS) {
     klineDates = sh.map((x) => x.d);
     klineArr = sh.map((x) => [x.o, x.c, x.h, x.l]);
   } else if (old?.kline?.length && old?.dates?.length) {
-    console.warn('   K 线没抓到，沿用上次的');
+    console.warn(
+      `   K 线${sh.length ? `只抓到 ${sh.length} 根（不足 ${COMPLETE_BARS}，判定不完整）` : '没抓到'}，沿用上次的 ${old.dates.length} 根`
+    );
     klineDates = old.dates;
     klineArr = old.kline;
   } else {
