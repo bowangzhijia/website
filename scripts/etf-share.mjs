@@ -1583,37 +1583,6 @@ function articleDone(date) {
   return existsSync(join(POSTS_DIR, `etf-share-${date}.md`));
 }
 
-/**
- * 22 点、23 点这两轮要不要等一等。
- *
- * 上交所的份额数据夜间发布时间不固定：实测 22:11 还没有、23:50 已经有了。
- * cron 每小时只触发一次，撞在空档上就整天没数据，所以这两轮改成
- * 跑完没拿到就睡一会儿再查，把一次触发摊成半个多小时的轮询。
- *
- * 22 点那轮只轻试两次：这个点数据基本不会出来（22:11 实测仍是 0 条），
- * 主要精力放在 23 点那一轮。白天触发一律不等，不占 runner。
- */
-function pollPlan() {
-  const hh = new Date(Date.now() + 8 * 3600e3).getUTCHours();
-  // 22 点只等一轮（这个点数据基本不会出来），23 点等两轮、跨度 40 分钟
-  if (hh === 22) return { maxTry: 1, waitMin: 20 };
-  if (hh === 23) return { maxTry: 2, waitMin: 20 };
-  return null;
-}
-
-/** 抓取失败时按需轮询；返回 null 表示不等了 */
-async function collectWithRetry(date) {
-  const plan = pollPlan();
-
-  for (let i = 0; ; i++) {
-    const snap = await collectDay(date);
-    if (snap) return snap;
-    if (!plan || i >= plan.maxTry) return null;
-    console.log(`   沪市还没发布，${plan.waitMin} 分钟后重试（${i + 1}/${plan.maxTry}）`);
-    await sleep(plan.waitMin * 60 * 1000);
-  }
-}
-
 async function main() {
   const args = parseArgs();
   const today = beijingToday();
@@ -1676,7 +1645,7 @@ async function main() {
    * 今天没数据就直接退出，等下一轮；真要补昨天的，交给 --refresh（次日早上那几次）。
    */
   if (!args.refresh) {
-    const snap = await collectWithRetry(today);
+    const snap = await collectDay(today);
     if (!snap) {
       console.log(`${today} 还没有数据（未发布或非交易日），等下一轮`);
       return;
@@ -1697,7 +1666,7 @@ async function main() {
       return;
     }
     // 今天这一轮允许等一会儿（23 点那轮交易所可能还没发），往前的日子直接抓
-    const snap = i === 0 ? await collectWithRetry(d) : await collectDay(d);
+    const snap = await collectDay(d);
     if (snap) {
       if (args.article) generateArticle(d);
       await buildHistory();
