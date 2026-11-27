@@ -526,14 +526,37 @@ const baskets: any[] = data?.baskets ?? [];
           infoEl.classList.add('fc__info--idle');
           infoEl.textContent = '点一下图表，这里显示当天数据';
         }
+
+        const showAt = (i: number) => {
+          if (i < 0 || i >= bars.length) return;
+          infoEl.classList.remove('fc__info--idle');
+          infoEl.innerHTML = infoHTML(i);
+        };
+
+        // 桌面：鼠标移动就更新（axisPointer 事件）
         chart.off('updateAxisPointer');
         chart.on('updateAxisPointer', (ev: any) => {
           const ax = ev.axesInfo && ev.axesInfo[0];
           if (!ax || ax.value == null) return;
-          const at = labels.indexOf(String(ax.value));
-          if (at < 0) return;
-          infoEl.classList.remove('fc__info--idle');
-          infoEl.innerHTML = infoHTML(at);
+          showAt(labels.indexOf(String(ax.value)));
+        });
+
+        /*
+         * 手机：直接听画布点击。
+         * 把 tooltip 关掉之后，axisPointer 就不再随手指触发了，
+         * 所以这里自己算——按点击的横坐标反推是第几根，再写信息条。
+         */
+        const zr = chart.getZr();
+        zr.off('click');
+        zr.on('click', (ev: any) => {
+          if (window.innerWidth > 760) return; // 桌面走鼠标悬浮，不重复处理
+          const x = ev.offsetX;
+          const y = ev.offsetY;
+          const inMain = chart.containPixel({ gridIndex: 0 }, [x, y]);
+          const inFlow = chart.containPixel({ gridIndex: 1 }, [x, y]);
+          if (!inMain && !inFlow) return;
+          const at = Math.round(chart.convertFromPixel({ xAxisIndex: 0 }, x) as number);
+          showAt(at);
         });
       }
 
