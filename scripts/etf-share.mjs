@@ -437,6 +437,15 @@ async function collectDay(date) {
   const sse = await fetchSse(date);
   console.log(`   沪市（上交所）：${sse.size} 只`);
 
+  /*
+   * 沪市为空就先撤，不去翻深市那几十页。
+   * 晚间轮询时这个分支会频繁走到，省下的请求直接决定重试能不能扛满半小时。
+   */
+  if (sse.size < 400) {
+    console.warn(`   沪市只有 ${sse.size} 只，当天还没发布，先不抓深市`);
+    return null;
+  }
+
   let szseMain = await fetchSzseShares(date);
   console.log(`   深市（fund_jjgm）：${szseMain.size} 只`);
 
@@ -1574,6 +1583,34 @@ function articleDone(date) {
   return existsSync(join(POSTS_DIR, `etf-share-${date}.md`));
 }
 
+/**
+ * 23 点这一轮要不要等一等。
+ *
+ * 上交所的份额数据夜间发布时间不固定，实测 22:11 还没有、23:50 就有了。
+ * cron 每小时只能触发一次，撞在空档上就整天没数据。所以这一轮改成
+ * 跑完没拿到就睡几分钟再查，把一次触发摊成半小时的轮询。
+ * 只在 23 点这么做——白天触发不该占着 runner 干等。
+ */
+function shouldPollForShares() {
+  const now = new Date(Date.now() + 8 * 3600e3);
+  return now.getUTCHours() === 23;
+}
+
+/** 抓取失败时按需轮询，最多 MAX_TRY 次 */
+async function collectWithRetry(date) {
+  const MAX_TRY = 5;
+  const WAIT_MIN = 6;
+
+  for (let i = 0; i <= MAX_TRY; i++) {
+    const snap = await collectDay(date);
+    if (snap) return snap;
+    if (i === MAX_TRY || !shouldPollForShares()) return null;
+    console.log(`   沪市还没发布，${WAIT_MIN} 分钟后重试（${i + 1}/${MAX_TRY}）`);
+    await sleep(WAIT_MIN * 60 * 1000);
+  }
+  return null;
+}
+
 async function main() {
   const args = parseArgs();
   const today = beijingToday();
@@ -1636,7 +1673,7 @@ async function main() {
    * 今天没数据就直接退出，等下一轮；真要补昨天的，交给 --refresh（次日早上那几次）。
    */
   if (!args.refresh) {
-    const snap = await collectDay(today);
+    const snap = await collectWithRetry(today);
     if (!snap) {
       console.log(`${today} 还没有数据（未发布或非交易日），等下一轮`);
       return;
@@ -1656,7 +1693,8 @@ async function main() {
       await buildHistory();
       return;
     }
-    const snap = await collectDay(d);
+    // 今天这一轮允许等一会儿（23 点那轮交易所可能还没发），往前的日子直接抓
+    const snap = i === 0 ? await collectWithRetry(d) : await collectDay(d);
     if (snap) {
       if (args.article) generateArticle(d);
       await buildHistory();
