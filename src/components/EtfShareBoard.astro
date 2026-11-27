@@ -206,11 +206,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
           {/* 份额异动清单：把 ≥11% 的全部摆出来，交给人工判断 */}
           {anomalies.length > 0 && (
-            <details class="an">
+            <details class="an" open>
               <summary class="an__sum">
                 <span class="an__ttl">份额异动清单</span>
                 <span class="an__n">{anomalies.length} 只</span>
-                <span class="an__more">点开核对</span>
+                <span class="an__more"></span>
               </summary>
               <p class="an__d">
                 单日份额变化 ≥11%，可能是大额申购，也可能是份额折算。标“疑似折算”的已按折算处理（净流入记 0），其余按正常申赎计算，最终以基金公司公告为准。
@@ -673,8 +673,13 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     color: var(--muted);
   }
 
-  .an[open] .an__more {
-    opacity: 0;
+  /* 默认展开，所以提示文字随展开状态切换 */
+  .an__more::after {
+    content: '点开核对';
+  }
+
+  .an[open] .an__more::after {
+    content: '收起';
   }
 
   .an__d {
