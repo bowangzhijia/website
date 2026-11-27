@@ -280,11 +280,25 @@ const baskets: any[] = data?.baskets ?? [];
           z: 3,
         }));
 
-      // 切换周期时重置可视范围：桌面看最近 140 根，手机看 70 根
-      // （手机屏幕窄，140 根挤进去每根不到 2px，K 线糊成一片）
+      /*
+       * 切换周期时重置可视范围。
+       *
+       * 不能所有周期都显示同样根数：年 K 总共才三十来根，显示 70 根等于
+       * 把 1998 年以来的全铺开，横轴一下退到上个世纪；周 K 相反，70 根才一年多。
+       * 所以按周期给不同的默认跨度。
+       */
       if (lastPeriod !== period) {
         lastPeriod = period;
-        const want = window.innerWidth <= 760 ? 70 : 140;
+        const narrow = window.innerWidth <= 760;
+        const spans: Record<string, [number, number]> = {
+          day: [140, 70],
+          week: [100, 60],
+          month: [60, 48],
+          quarter: [30, 20],
+          year: [15, 10],
+        };
+        const pair = spans[period] || spans.day;
+        const want = narrow ? pair[1] : pair[0];
         const span = Math.min(want, bars.length);
         zoom = { start: Math.max(0, 100 - (span / Math.max(bars.length, 1)) * 100), end: 100 };
       }
