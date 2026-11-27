@@ -299,31 +299,33 @@ const baskets: any[] = data?.baskets ?? [];
         const b = bars[i];
         if (!b) return '';
 
-        let s = `<b>${b.label}</b>`;
+        const parts: string[] = [`<b>${b.label}</b>`];
 
-        // 只留收盘价和涨跌幅（相对上一根），开高低和均线都不显示，读起来更干脆
+        // 收盘价 + 涨跌幅
         if (b.c != null) {
           const prevC = i > 0 ? bars[i - 1].c : null;
           const chg = prevC ? ((b.c - prevC) / prevC) * 100 : null;
           const color = chg == null || chg === 0 ? '' : chg > 0 ? up : down;
-          s += `　收 <b${color ? ` style="color:${color}"` : ''}>${b.c.toFixed(2)}</b>`;
+          parts.push(`收 <b${color ? ` style="color:${color}"` : ''}>${b.c.toFixed(2)}</b>`);
           if (chg != null) {
-            s += `　<span style="color:${color || muted}">${chg > 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+            parts.push(`<span style="color:${color || muted}">${chg > 0 ? '+' : ''}${chg.toFixed(2)}%</span>`);
           }
         }
 
+        // 篮子净流入 / 特殊情况说明
         const f = b.flow;
         if (i > flowEnd) {
-          s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
+          parts.push('<span style="opacity:.6">份额还没公布</span>');
         } else if (b.label < bStart) {
-          s += `<br/><span style="opacity:.6">这个篮子的份额记录从 ${bStart} 起</span>`;
+          parts.push(`<span style="opacity:.6">份额记录从 ${bStart} 起</span>`);
         } else if (f === 0) {
-          s += `<br/><span style="opacity:.6">这天份额没有变动</span>`;
+          parts.push('<span style="opacity:.6">份额无变动</span>');
         } else {
-          s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
+          parts.push(`${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`);
         }
 
-        return s;
+        // 全部挤成一行，用全角空格分隔
+        return parts.join('　');
       };
 
       chart.setOption(
@@ -793,14 +795,14 @@ const baskets: any[] = data?.baskets ?? [];
   .fc__info {
     display: none;
     margin-top: 8px;
-    padding: 9px 12px;
+    padding: 8px 11px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--surface);
     font-size: 12px;
-    line-height: 1.78;
+    line-height: 1.6;
     color: var(--text);
-    min-height: 46px;
+    min-height: 34px;
   }
 
   .fc__info--idle {
