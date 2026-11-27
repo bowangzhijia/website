@@ -293,6 +293,15 @@ const baskets: any[] = data?.baskets ?? [];
           axisPointer: { link: [{ xAxisIndex: 'all' }] },
           tooltip: {
             trigger: 'axis',
+            /*
+             * confine：把提示框限制在图表区域内。
+             * 不设这个，手指点在靠左的日子时，提示框会往左超出屏幕，
+             * 手机竖屏上就是一截内容看不见。
+             * max-width 兜住长文案，让它换行而不是横向撑出屏幕。
+             */
+            confine: true,
+            extraCssText:
+              'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);',
             axisPointer: { type: 'cross', crossStyle: { color: muted } },
             backgroundColor: css('--surface', '#fff'),
             borderColor: line,
@@ -326,9 +335,17 @@ const baskets: any[] = data?.baskets ?? [];
               return s;
             },
           },
+          /*
+           * 用百分比而不是像素。
+           *
+           * 之前写的是 { top: 256, height: 88 } 这种绝对值，是按 384px 高的画布算的。
+           * 手机上画布只有 320px，第二个图（资金流）下沿直接跑到容器外面被裁掉——
+           * 表现为"下面那部分显示不全"。
+           * 改成百分比后，不管画布多高都会按比例铺满。
+           */
           grid: [
-            { left: 60, right: 18, top: 14, height: 208 },
-            { left: 60, right: 18, top: 256, height: 88 },
+            { left: 46, right: 12, top: 12, height: '50%' },
+            { left: 46, right: 12, top: '68%', height: '22%' },
           ],
           xAxis: [
             {
