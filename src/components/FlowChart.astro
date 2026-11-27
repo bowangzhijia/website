@@ -351,7 +351,15 @@ const baskets: any[] = data?.baskets ?? [];
               const cw = size.contentSize[0];
               return [Math.max(6, (vw - cw) / 2), 6];
             },
-            axisPointer: { type: 'cross', crossStyle: { color: muted } },
+            axisPointer: {
+              type: 'cross',
+              crossStyle: { color: muted },
+              /*
+               * 十字线保留（看位置有用），但坐标标签在手机上关掉。
+               * 那个蓝底白字的日期框会直接压在 K 线上，是遮挡的另一半来源。
+               */
+              label: { show: window.innerWidth > 760 },
+            },
             backgroundColor: css('--surface', '#fff'),
             borderColor: line,
             textStyle: { color: text, fontSize: 12 },
