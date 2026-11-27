@@ -304,6 +304,9 @@ const baskets: any[] = data?.baskets ?? [];
         zoom = { start: Math.max(0, 100 - (span / Math.max(bars.length, 1)) * 100), end: 100 };
       }
 
+      // 横轴标签去重用的状态，每次重建图表都清零
+      let lastAxisMonth = '';
+
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
 
       /**
@@ -453,23 +456,32 @@ const baskets: any[] = data?.baskets ?? [];
                 fontSize: 10,
                 hideOverlap: true,
                 /*
-                 * 窄屏只靠 hideOverlap 会自动丢掉大部分标签，年份首先被丢，
-                 * 导致手机上完全看不出横轴跨了哪几年。
+                 * 全部基于 value 判断，不用回调的 index。
+                 * index 在 category 轴上并不总是数据索引，拿它去查 labels 会串位，
+                 * 之前出现的「2026 2026 2026」和「1月 4月 7月 10月 1月」都是这么来的。
                  *
-                 * 这里改成「跨年显示年份、每季度显示月份」，用 interval 主动控制
-                 * 哪些点出标签，不再依赖容器宽度去猜。
+                 * 规则：1/4/7/10 月各留一个刻度；1 月标年份，其余标月份。
+                 * 季K 的标签是 "2026-Q1" 这种，单独处理成 Q1。
                  */
-                interval: (index: number, value: string) => {
-                  const prev = index > 0 ? labels[index - 1] : '';
-                  if (!prev) return true;
-                  if (prev.slice(0, 4) !== value.slice(0, 4)) return true;
-                  const m = Number(value.slice(5, 7));
-                  return m !== Number(prev.slice(5, 7)) && [1, 4, 7, 10].includes(m);
-                },
-                formatter: (value: string, index: number) => {
-                  const prev = index > 0 ? labels[index - 1] : '';
-                  if (!prev || prev.slice(0, 4) !== value.slice(0, 4)) return value.slice(0, 4);
-                  return `${Number(value.slice(5, 7))}月`;
+                /*
+                 * 交回 ECharts 自动排布。
+                 *
+                 * 试过用数字 interval 控制数量，但它算的是「全部数据」的间隔，
+                 * 而横轴挂的是 8700 多根日K（dataZoom 只截取可见部分），
+                 * 结果每隔一千多根才出一个标签，可见区域内只剩一个。
+                 * 自动排布会按容器宽度决定数量，配合下面带年份的格式，够用了。
+                 */
+                interval: 'auto',
+                formatter: (value: string) => {
+                  const v = String(value);
+                  const m = /^\d{4}-(\d{2})/.exec(v);
+                  const month = m ? Number(m[1]) : 1;
+
+                  if (period === 'y') return v.slice(0, 4);
+                  // 季K 的标签落在季末（03-31 / 06-30 / 09-30 / 12-31），换算成 Q
+                  if (period === 'q') return `${v.slice(0, 4)}-Q${Math.ceil(month / 3)}`;
+                  // 其余周期统一「年-月」，年份始终可见
+                  return `${v.slice(2, 4)}-${v.slice(5, 7)}`;
                 },
               },
             },
