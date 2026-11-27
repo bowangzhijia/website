@@ -554,22 +554,30 @@ const baskets: any[] = data?.baskets ?? [];
         });
 
         /*
-         * 手机：直接听画布点击。
-         * 把 tooltip 关掉之后，axisPointer 就不再随手指触发了，
-         * 所以这里自己算——按点击的横坐标反推是第几根，再写信息条。
+         * 手机：直接听画布上的触点，click 和 mousemove 都接。
+         *
+         * 只挂 click 的话，要等手指抬起才更新，手感很钝；
+         * 接上 mousemove（触摸拖动会被映射成它）之后，手指一按下去就跟着变，
+         * 和看盘软件的手感一致。
          */
         const zr = chart.getZr();
-        zr.off('click');
-        zr.on('click', (ev: any) => {
-          if (window.innerWidth > 760) return; // 桌面走鼠标悬浮，不重复处理
-          const x = ev.offsetX;
-          const y = ev.offsetY;
-          const inMain = chart.containPixel({ gridIndex: 0 }, [x, y]);
-          const inFlow = chart.containPixel({ gridIndex: 1 }, [x, y]);
-          if (!inMain && !inFlow) return;
-          const at = Math.round(chart.convertFromPixel({ xAxisIndex: 0 }, x) as number);
-          showAt(at);
-        });
+        if (!infoEl.dataset.wired) {
+          infoEl.dataset.wired = '1';
+
+          const onPoint = (ev: any) => {
+            if (window.innerWidth > 760) return; // 桌面走鼠标悬浮
+            const x = ev.offsetX;
+            const y = ev.offsetY;
+            if (!chart.containPixel({ gridIndex: 0 }, [x, y]) && !chart.containPixel({ gridIndex: 1 }, [x, y])) {
+              return;
+            }
+            const at = Math.round(chart.convertFromPixel({ xAxisIndex: 0 }, x) as number);
+            showAt(at);
+          };
+
+          zr.on('click', onPoint);
+          zr.on('mousemove', onPoint);
+        }
       }
 
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
