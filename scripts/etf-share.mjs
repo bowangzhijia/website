@@ -575,7 +575,8 @@ function computeChanges(date) {
     let isSplit = false;
     if (p.close && it.close) {
       const shareRatio = it.share / p.share;
-      if (Math.abs(shareRatio - 1) > 0.08) {
+      // 门槛 11%：覆盖 1:1.11 这类小幅折算，同时把日常申赎（通常 <5%）挡在外面
+      if (Math.abs(shareRatio - 1) > 0.11) {
         const priceRatio = it.close / p.close;
         if (Math.abs(shareRatio * priceRatio - 1) < 0.05) {
           isSplit = true;
