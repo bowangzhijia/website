@@ -85,6 +85,9 @@ const streak = pool
 const baskets: any[] = data?.baskets ?? [];
 const basketAmount = baskets.reduce((s: number, b: any) => s + (b.amt || 0), 0);
 
+/** 份额单日变化 ≥11% 的，列出来供人工核对（折算还是大额申赎，看公告才能定） */
+const anomalies: any[] = (data?.anomalies ?? []).slice(0, 30);
+
 const [, mm, dd] = (data?.date || '---- -- --').split('-');
 const dateLabel = mm ? `${Number(mm)}月${Number(dd)}日` : '';
 
@@ -199,6 +202,55 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                 ，其余 {rows.length - baskets.reduce((s: number, b: any) => s + (b.n || 0), 0)} 行变动来自行业主题、跨境、债券和商品。
               </p>
             </section>
+          )}
+
+          {/* 份额异动清单：把 ≥11% 的全部摆出来，交给人工判断 */}
+          {anomalies.length > 0 && (
+            <details class="an">
+              <summary class="an__sum">
+                <span class="an__ttl">份额异动清单</span>
+                <span class="an__n">{anomalies.length} 只</span>
+                <span class="an__more">点开核对</span>
+              </summary>
+              <p class="an__d">
+                单日份额变化 ≥11%，可能是大额申购，也可能是份额折算。标“疑似折算”的已按折算处理（净流入记 0），其余按正常申赎计算，最终以基金公司公告为准。
+              </p>
+              <div class="an__wrap">
+                <table class="an__tb">
+                  <thead>
+                    <tr>
+                      <th>代码</th>
+                      <th>名称</th>
+                      <th class="r">份额变化</th>
+                      <th class="r">涨跌幅</th>
+                      <th class="r">规模(亿)</th>
+                      <th class="r">净流入(亿)</th>
+                      <th>判定</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {anomalies.map((a: any) => (
+                      <tr>
+                        <td class="code">{a.c}</td>
+                        <td class="nm">{a.n}</td>
+                        <td class={`r amt ${a.p > 0 ? 'up' : 'down'}`}>
+                          {a.p > 0 ? '+' : ''}
+                          {a.p}%
+                        </td>
+                        <td class="r dim">{a.chg == null ? '—' : (a.chg > 0 ? '+' : '') + a.chg + '%'}</td>
+                        <td class="r dim">{a.sc}</td>
+                        <td class={`r amt ${a.amt == null ? 'dim' : a.amt > 0 ? 'up' : a.amt < 0 ? 'down' : 'dim'}`}>
+                          {a.amt == null ? '—' : (a.amt > 0 ? '+' : '') + a.amt}
+                        </td>
+                        <td class="an__tag">
+                          {a.sp ? <span class="an__badge is-split">疑似折算</span> : <span class="an__badge">正常申赎</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           )}
 
           <p class="scope">
@@ -579,6 +631,125 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     line-height: 1.7;
   }
 
+  /* ===== 份额异动清单 ===== */
+  .an {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+  }
+
+  .an__sum {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .an__sum::-webkit-details-marker {
+    display: none;
+  }
+
+  .an__ttl {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .an__n {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ma30) 10%, transparent);
+    color: var(--ma30);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .an__more {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .an[open] .an__more {
+    opacity: 0;
+  }
+
+  .an__d {
+    margin: 10px 0 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .an__wrap {
+    margin-top: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .an__tb {
+    width: 100%;
+    min-width: 540px;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .an__tb th,
+  .an__tb td {
+    padding: 7px 9px;
+    border-bottom: 1px solid var(--hairline);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .an__tb th {
+    background: var(--thead-fill);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .an__tb tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .an__tb .r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .an__tb .amt {
+    font-weight: 700;
+  }
+
+  .an__tb .code {
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+  }
+
+  .an__tb .nm {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .an__badge {
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .an__badge.is-split {
+    border-color: color-mix(in srgb, var(--ma30) 45%, transparent);
+    background: color-mix(in srgb, var(--ma30) 8%, transparent);
+    color: var(--ma30);
+  }
+
   .scope {
     margin: 0 0 16px;
     padding: 10px 14px;
@@ -669,6 +840,23 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
   /* 手机竖屏：卡片和数字都缩一档，否则四列统计挤成豆腐块 */
   @media (max-width: 560px) {
+    .an {
+      padding: 12px 13px;
+    }
+
+    .an__ttl {
+      font-size: 14px;
+    }
+
+    .an__tb {
+      font-size: 11.5px;
+    }
+
+    .an__tb th,
+    .an__tb td {
+      padding: 5px 6px;
+    }
+
     .stat {
       padding: 11px 13px;
     }

@@ -935,6 +935,25 @@ function writeLatest(date, { prev, rows }, dates) {
         amt: Math.round(m.amt * 100) / 100,
       })),
     })),
+    /*
+     * 份额异动清单：份额单日变化 ≥11% 的全部列出来，供人工核对。
+     *
+     * 为什么单独列：11% 这条线上下最容易混淆——可能是一次大额申购，也可能是
+     * 份额折算。自动判断只能给个倾向（sp=1 表示判成折算），真正对不对得看公告。
+     * 把可疑的都摆出来，比让程序自己拍板更可靠。
+     */
+    anomalies: rows
+      .filter((r) => Math.abs(r.deltaPct) >= 11)
+      .map((r) => ({
+        c: r.code,
+        n: r.name,
+        p: +r.deltaPct.toFixed(2),
+        chg: r.chgPct ?? null,
+        amt: r.amount == null ? null : Math.round(r.amount / 1e6) / 100,
+        sc: Math.round(r.sc * 100) / 100,
+        sp: r.split || 0,
+      }))
+      .sort((a, b) => Math.abs(b.p) - Math.abs(a.p)),
     rows: rows
       .map((r) => ({
         c: r.code,
