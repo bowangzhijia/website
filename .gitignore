@@ -16,3 +16,4 @@ panel.png
 
 # AI 助手的项目笔记 / 上下文备份，只留在本机，不进公开仓库
 .codebuddy/
+.dev-server.txt
