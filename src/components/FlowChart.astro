@@ -347,7 +347,30 @@ const baskets: any[] = data?.baskets ?? [];
               boundaryGap: true,
               axisLine: { lineStyle: { color: line } },
               axisTick: { show: false },
-              axisLabel: { color: muted, fontSize: 10, hideOverlap: true },
+              axisLabel: {
+                color: muted,
+                fontSize: 10,
+                hideOverlap: true,
+                /*
+                 * 窄屏只靠 hideOverlap 会自动丢掉大部分标签，年份首先被丢，
+                 * 导致手机上完全看不出横轴跨了哪几年。
+                 *
+                 * 这里改成「跨年显示年份、每季度显示月份」，用 interval 主动控制
+                 * 哪些点出标签，不再依赖容器宽度去猜。
+                 */
+                interval: (index: number, value: string) => {
+                  const prev = index > 0 ? labels[index - 1] : '';
+                  if (!prev) return true;
+                  if (prev.slice(0, 4) !== value.slice(0, 4)) return true;
+                  const m = Number(value.slice(5, 7));
+                  return m !== Number(prev.slice(5, 7)) && [1, 4, 7, 10].includes(m);
+                },
+                formatter: (value: string, index: number) => {
+                  const prev = index > 0 ? labels[index - 1] : '';
+                  if (!prev || prev.slice(0, 4) !== value.slice(0, 4)) return value.slice(0, 4);
+                  return `${Number(value.slice(5, 7))}月`;
+                },
+              },
             },
           ],
           yAxis: [
