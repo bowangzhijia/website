@@ -1595,8 +1595,9 @@ function articleDone(date) {
  */
 function pollPlan() {
   const hh = new Date(Date.now() + 8 * 3600e3).getUTCHours();
-  if (hh === 22) return { maxTry: 2, waitMin: 10 };
-  if (hh === 23) return { maxTry: 4, waitMin: 10 };
+  // 22 点只等一轮（这个点数据基本不会出来），23 点等两轮、跨度 40 分钟
+  if (hh === 22) return { maxTry: 1, waitMin: 20 };
+  if (hh === 23) return { maxTry: 2, waitMin: 20 };
   return null;
 }
 
