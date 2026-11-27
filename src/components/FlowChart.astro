@@ -298,28 +298,31 @@ const baskets: any[] = data?.baskets ?? [];
       const infoHTML = (i: number): string => {
         const b = bars[i];
         if (!b) return '';
-        const f = b.flow;
+
         let s = `<b>${b.label}</b>`;
-        if (b.o != null) {
-          const rising = b.c >= b.o;
-          s +=
-            `<br/>开 ${b.o.toFixed(2)}　收 <b style="color:${rising ? up : down}">${b.c.toFixed(2)}</b>` +
-            `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
+
+        // 只留收盘价和涨跌幅（相对上一根），开高低和均线都不显示，读起来更干脆
+        if (b.c != null) {
+          const prevC = i > 0 ? bars[i - 1].c : null;
+          const chg = prevC ? ((b.c - prevC) / prevC) * 100 : null;
+          const color = chg == null || chg === 0 ? '' : chg > 0 ? up : down;
+          s += `　收 <b${color ? ` style="color:${color}"` : ''}>${b.c.toFixed(2)}</b>`;
+          if (chg != null) {
+            s += `　<span style="color:${color || muted}">${chg > 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+          }
         }
+
+        const f = b.flow;
         if (i > flowEnd) {
           s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
         } else if (b.label < bStart) {
           s += `<br/><span style="opacity:.6">这个篮子的份额记录从 ${bStart} 起</span>`;
         } else if (f === 0) {
-          s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
+          s += `<br/><span style="opacity:.6">这天份额没有变动</span>`;
         } else {
           s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
         }
-        const maLine = [30, 60, 250]
-          .filter((n) => maOn[n] && maData[n][i] != null)
-          .map((n) => `<span style="color:${maColor(n)}">MA${n} ${maData[n][i]}</span>`)
-          .join('　');
-        if (maLine) s += `<br/>${maLine}`;
+
         return s;
       };
 
