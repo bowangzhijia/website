@@ -556,7 +556,34 @@ function computeChanges(date) {
     const p = prevMap.get(it.code);
     // 新上市 / 前一交易日没数据 → 跳过，不能当成巨额申购
     if (!p || !p.share || p.share < MIN_PREV_SHARE) continue;
-    const delta = it.share - p.share;
+
+    let delta = it.share - p.share;
+
+    /*
+     * 份额折算检测（当日）。
+     *
+     * 判据和历史图表那边一致：份额比值 × 价格比值 ≈ 1，说明是拆分/合并，
+     * 不是真实申购——拆分后份额变多少，价格就反向变多少，总市值守恒。
+     *
+     * 为什么当日也要查：历史图表里做过这个保护，但「今日榜单」这条路径没有。
+     * 某只 ETF 当天拆分（比如 1:1.11），份额凭空 +11%，乘上除权后的价格，
+     * 就会算出几亿的假净流入，把当天榜单直接带偏。
+     *
+     * 检出后把份额变化记为 0：拆分当天的真实申赎和被拆分混在一起分不开，
+     * 与其给个虚高数字，不如不给（规模不受影响，因为份额×价格是守恒的）。
+     */
+    let isSplit = false;
+    if (p.close && it.close) {
+      const shareRatio = it.share / p.share;
+      if (Math.abs(shareRatio - 1) > 0.08) {
+        const priceRatio = it.close / p.close;
+        if (Math.abs(shareRatio * priceRatio - 1) < 0.05) {
+          isSplit = true;
+          delta = 0;
+        }
+      }
+    }
+
     // 份额没变的也要留：搜索框要能查到任意一只，不然抽查某只查不到会以为数据缺了
     const sc = scaleOf(it.share, it.close);
     const prevSc = scaleOf(p.share, p.close ?? it.close);
@@ -571,6 +598,8 @@ function computeChanges(date) {
       sc, // 当前规模(亿元)
       // 昨天在门槛外、今天进来的，标出来——规模突然做大本身也是信号
       newIn: sc >= MIN_SCALE && prevSc < MIN_SCALE ? 1 : 0,
+      // 当天发生过份额折算时标出来，前端和文章可以提示"当日有份额折算"
+      split: isSplit ? 1 : 0,
     });
   }
   return { prev: prevDate, rows };
