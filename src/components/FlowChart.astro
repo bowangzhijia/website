@@ -280,10 +280,12 @@ const baskets: any[] = data?.baskets ?? [];
           z: 3,
         }));
 
-      // 切换周期时重置可视范围：默认看到最近 140 根
+      // 切换周期时重置可视范围：桌面看最近 140 根，手机看 70 根
+      // （手机屏幕窄，140 根挤进去每根不到 2px，K 线糊成一片）
       if (lastPeriod !== period) {
         lastPeriod = period;
-        const span = Math.min(140, bars.length);
+        const want = window.innerWidth <= 760 ? 70 : 140;
+        const span = Math.min(want, bars.length);
         zoom = { start: Math.max(0, 100 - (span / Math.max(bars.length, 1)) * 100), end: 100 };
       }
 
@@ -361,7 +363,7 @@ const baskets: any[] = data?.baskets ?? [];
               // 手机上只要一条竖线，跟着点的地方走；桌面保留十字线
               type: window.innerWidth > 760 ? 'cross' : 'line',
               crossStyle: { color: muted },
-              lineStyle: { color: muted, width: 1, type: 'dashed' },
+              lineStyle: { color: muted, width: 1, type: 'solid' },
               label: { show: window.innerWidth > 760 },
             },
             backgroundColor: css('--surface', '#fff'),
