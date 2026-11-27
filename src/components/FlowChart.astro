@@ -66,6 +66,9 @@ const baskets: any[] = data?.baskets ?? [];
 
       <div class="fc__canvas" data-canvas />
 
+      {/* 手机上把当天信息显示在图外，避免遮挡 K 线 */}
+      <div class="fc__info" data-info></div>
+
       <p class="fc__note" data-note />
     </section>
   )
@@ -286,12 +289,46 @@ const baskets: any[] = data?.baskets ?? [];
 
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
 
+      /**
+       * 把某一天的信息拼成 HTML。
+       * 桌面端给 tooltip 用，手机端给图外那个信息条用——同一份逻辑，两处展示。
+       */
+      const infoHTML = (i: number): string => {
+        const b = bars[i];
+        if (!b) return '';
+        const f = b.flow;
+        let s = `<b>${b.label}</b>`;
+        if (b.o != null) {
+          const rising = b.c >= b.o;
+          s +=
+            `<br/>开 ${b.o.toFixed(2)}　收 <b style="color:${rising ? up : down}">${b.c.toFixed(2)}</b>` +
+            `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
+        }
+        if (i > flowEnd) {
+          s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
+        } else if (b.label < bStart) {
+          s += `<br/><span style="opacity:.6">这个篮子的份额记录从 ${bStart} 起</span>`;
+        } else if (f === 0) {
+          s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
+        } else {
+          s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
+        }
+        const maLine = [30, 60, 250]
+          .filter((n) => maOn[n] && maData[n][i] != null)
+          .map((n) => `<span style="color:${maColor(n)}">MA${n} ${maData[n][i]}</span>`)
+          .join('　');
+        if (maLine) s += `<br/>${maLine}`;
+        return s;
+      };
+
       chart.setOption(
         {
           animation: false,
           backgroundColor: 'transparent',
           axisPointer: { link: [{ xAxisIndex: 'all' }] },
           tooltip: {
+            // 手机上关掉浮层——不管放哪都会压住 K 线，改用图表下方的信息条
+            show: window.innerWidth > 760,
             trigger: 'axis',
             /*
              * confine：把提示框限制在图表区域内。
@@ -468,6 +505,29 @@ const baskets: any[] = data?.baskets ?? [];
         if (z) zoom = { start: z.start, end: z.end };
         updateLegend();
       });
+
+      /*
+       * 手机端的图外信息条。
+       * 浮层怎么摆都会压住 K 线，干脆拿到图表外面来显示——
+       * 点一下（或拖动十字线）就把当天数据写到下面这行，图本身始终完整可见。
+       */
+      const infoEl = root.querySelector('[data-info]') as HTMLElement | null;
+      if (infoEl) {
+        if (!infoEl.dataset.ready) {
+          infoEl.dataset.ready = '1';
+          infoEl.classList.add('fc__info--idle');
+          infoEl.textContent = '点一下图表，这里显示当天数据';
+        }
+        chart.off('updateAxisPointer');
+        chart.on('updateAxisPointer', (ev: any) => {
+          const ax = ev.axesInfo && ev.axesInfo[0];
+          if (!ax || ax.value == null) return;
+          const at = labels.indexOf(String(ax.value));
+          if (at < 0) return;
+          infoEl.classList.remove('fc__info--idle');
+          infoEl.innerHTML = infoHTML(at);
+        });
+      }
 
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
       note.textContent = `柱子 = ${label} 每日净流入合计，份额记录从 ${dates[flowStart] || '2016 年'} 开始`;
@@ -687,6 +747,30 @@ const baskets: any[] = data?.baskets ?? [];
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+  }
+
+  /* 手机端的图外信息条：桌面端用 tooltip，这里不占地方 */
+  .fc__info {
+    display: none;
+    margin-top: 8px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 12px;
+    line-height: 1.78;
+    color: var(--text);
+    min-height: 46px;
+  }
+
+  .fc__info--idle {
+    color: var(--muted);
+  }
+
+  @media (max-width: 760px) {
+    .fc__info {
+      display: block;
+    }
   }
 
   .fc__note {
