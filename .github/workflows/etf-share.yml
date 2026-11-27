@@ -40,7 +40,9 @@ concurrency:
 jobs:
   etf-share:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 23 点那轮会在脚本内部轮询半小时（等交易所发布份额），
+    # 这里必须留出余量：30 分钟轮询 + 抓取构建部署，40 分钟够用
+    timeout-minutes: 40
 
     steps:
       - name: 拉取代码
