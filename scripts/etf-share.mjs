@@ -1091,6 +1091,28 @@ async function fetchIndexKline(secid, days = 90) {
   if (failed) {
     console.warn(`   ⚠ K 线共 ${segs.length} 段，${failed} 段失败，返回 ${out.length} 根（不完整）`);
   }
+
+  /*
+   * 丢掉「今天还没收盘」的那根。
+   *
+   * 白天跑的时候东财会返回当天的盘中快照，写进去就是错的：
+   * 上午 11 点抓的 11-27 收在 3478，实际收盘是 3606（当天大涨 3.7%），
+   * 图上那根 K 线看起来跟昨天一模一样，信息条里的涨跌幅也是假的。
+   * 15:30 之前一律剔掉当天，晚上再跑才有收盘价。
+   */
+  const nowB = new Date(Date.now() + 8 * 3600e3);
+  const hh = nowB.getUTCHours();
+  const mm = nowB.getUTCMinutes();
+  const beforeClose = hh < 15 || (hh === 15 && mm < 30);
+  if (beforeClose && out.length) {
+    const todayB = nowB.toISOString().slice(0, 10);
+    const trimmed = out.filter((x) => x.d !== todayB);
+    if (trimmed.length !== out.length) {
+      console.log(`   今天 ${todayB} 还没收盘，丢掉这根未完成的 K 线`);
+    }
+    return trimmed;
+  }
+
   return out;
 }
 
