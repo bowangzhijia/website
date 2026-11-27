@@ -1584,31 +1584,33 @@ function articleDone(date) {
 }
 
 /**
- * 23 点这一轮要不要等一等。
+ * 22 点、23 点这两轮要不要等一等。
  *
- * 上交所的份额数据夜间发布时间不固定，实测 22:11 还没有、23:50 就有了。
- * cron 每小时只能触发一次，撞在空档上就整天没数据。所以这一轮改成
- * 跑完没拿到就睡几分钟再查，把一次触发摊成半小时的轮询。
- * 只在 23 点这么做——白天触发不该占着 runner 干等。
+ * 上交所的份额数据夜间发布时间不固定：实测 22:11 还没有、23:50 已经有了。
+ * cron 每小时只触发一次，撞在空档上就整天没数据，所以这两轮改成
+ * 跑完没拿到就睡一会儿再查，把一次触发摊成半个多小时的轮询。
+ *
+ * 22 点那轮只轻试两次：这个点数据基本不会出来（22:11 实测仍是 0 条），
+ * 主要精力放在 23 点那一轮。白天触发一律不等，不占 runner。
  */
-function shouldPollForShares() {
-  const now = new Date(Date.now() + 8 * 3600e3);
-  return now.getUTCHours() === 23;
+function pollPlan() {
+  const hh = new Date(Date.now() + 8 * 3600e3).getUTCHours();
+  if (hh === 22) return { maxTry: 2, waitMin: 10 };
+  if (hh === 23) return { maxTry: 4, waitMin: 10 };
+  return null;
 }
 
-/** 抓取失败时按需轮询，最多 MAX_TRY 次 */
+/** 抓取失败时按需轮询；返回 null 表示不等了 */
 async function collectWithRetry(date) {
-  const MAX_TRY = 5;
-  const WAIT_MIN = 6;
+  const plan = pollPlan();
 
-  for (let i = 0; i <= MAX_TRY; i++) {
+  for (let i = 0; ; i++) {
     const snap = await collectDay(date);
     if (snap) return snap;
-    if (i === MAX_TRY || !shouldPollForShares()) return null;
-    console.log(`   沪市还没发布，${WAIT_MIN} 分钟后重试（${i + 1}/${MAX_TRY}）`);
-    await sleep(WAIT_MIN * 60 * 1000);
+    if (!plan || i >= plan.maxTry) return null;
+    console.log(`   沪市还没发布，${plan.waitMin} 分钟后重试（${i + 1}/${plan.maxTry}）`);
+    await sleep(plan.waitMin * 60 * 1000);
   }
-  return null;
 }
 
 async function main() {
