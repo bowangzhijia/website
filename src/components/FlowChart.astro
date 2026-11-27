@@ -649,6 +649,26 @@ const baskets: any[] = data?.baskets ?? [];
     }
   }
 
+  /* 手机横屏：可视高度只剩三百多，图必须按视口算，否则被截掉一半。
+     放在竖屏规则后面，避免小屏横屏时被 320px 覆盖掉 */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .fc__canvas {
+      height: 62vh;
+      min-height: 190px;
+    }
+
+    .fc__legend {
+      gap: 8px;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+
+    .fc__note {
+      font-size: 11px;
+      margin-top: 6px;
+    }
+  }
+
   /* 手机竖屏：周期和均线按钮一共 8 个，不缩小会挤成三行 */
   @media (max-width: 560px) {
     .fc__canvas {

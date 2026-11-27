@@ -954,6 +954,45 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       font-size: 12px;
     }
   }
+
+  /*
+   * 手机横屏：可视高度只剩三百多，而图在上面被标题、导语、统计卡片挤到屏幕外。
+   * 这里把上方元素全压扁，让 K 线图尽快进入视野——横屏就是为了看大图。
+   */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .sc {
+      padding-top: 10px;
+    }
+
+    .sc__title {
+      margin: 4px 0 6px;
+      font-size: 18px;
+    }
+
+    .sc__lead,
+    .sc__meta,
+    .scope {
+      display: none;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin: 8px 0 10px;
+    }
+
+    .stat {
+      padding: 7px 9px;
+    }
+
+    .stat__k {
+      font-size: 10px;
+    }
+
+    .stat__v {
+      font-size: 15px;
+    }
+  }
 </style>
 
 <style is:global>
