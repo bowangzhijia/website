@@ -290,14 +290,15 @@ const baskets: any[] = data?.baskets ?? [];
       if (lastPeriod !== period) {
         lastPeriod = period;
         const narrow = window.innerWidth <= 760;
+        // 注意 key 是单字母：d / w / m / q / y（按钮的 data-period 就是这个）
         const spans: Record<string, [number, number]> = {
-          day: [140, 70],
-          week: [100, 60],
-          month: [60, 48],
-          quarter: [30, 20],
-          year: [15, 10],
+          d: [140, 70],
+          w: [100, 60],
+          m: [60, 48],
+          q: [30, 20],
+          y: [15, 10],
         };
-        const pair = spans[period] || spans.day;
+        const pair = spans[period] || spans.d;
         const want = narrow ? pair[1] : pair[0];
         const span = Math.min(want, bars.length);
         zoom = { start: Math.max(0, 100 - (span / Math.max(bars.length, 1)) * 100), end: 100 };
