@@ -302,6 +302,21 @@ const baskets: any[] = data?.baskets ?? [];
             confine: true,
             extraCssText:
               'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);',
+            /*
+             * 手机上固定贴在图表底部居中。
+             * 默认是跟着手指走的，K 线本来就密，框一出来正好把手正在看的那段盖住。
+             * 固定到底部后，上面的 K 线始终可见，代价是会压到资金流柱子——
+             * 那部分矮，比盖住价格重要。
+             */
+            position: (point: any, params: any, dom: any, rect: any, size: any) => {
+              // 桌面端跟着鼠标走，稍微偏移一点不挡光标
+              if (window.innerWidth > 760) return [point[0] + 14, point[1] + 14];
+              const vw = size.viewSize[0];
+              const vh = size.viewSize[1];
+              const cw = size.contentSize[0];
+              const ch = size.contentSize[1];
+              return [Math.max(6, (vw - cw) / 2), Math.max(6, vh - ch - 6)];
+            },
             axisPointer: { type: 'cross', crossStyle: { color: muted } },
             backgroundColor: css('--surface', '#fff'),
             borderColor: line,
