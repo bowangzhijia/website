@@ -111,7 +111,16 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
         <p class="sc__meta">每个交易日 20:30 前后更新；当晚交易所尚未披露的，次日上午 9 点后补上</p>
       </header>
 
-      {data && <RunStatus date={data.date} total={data.total} />}
+      {data && <RunStatus date={data.date} total={data.total} partial={data.partial} />}
+
+      {/* 深市还没发布时给个明确交代，否则读者会以为净流入偏小是市场本身如此 */}
+      {data?.partial ? (
+        <p class="scope is-partial">
+          <strong>深市份额还没发布。</strong>
+          上交所已公布，深交所按规则次日盘前才出，所以这一版只有沪市 {rows.filter((r: any) => r.m === 'sh').length} 只，
+          深市约 780 只没算进来，<strong>净流入会偏小</strong>。明早深市到了会自动覆盖成完整数据。
+        </p>
+      ) : null}
 
       {data && (
         <>
@@ -766,6 +775,12 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     font-size: 13px;
     line-height: 1.75;
     color: var(--text-dim);
+  }
+
+  /* 深市未发布：换成橙色边，一眼看出这版数据不完整 */
+  .scope.is-partial {
+    border-left-color: var(--ma30);
+    background: color-mix(in srgb, var(--ma30) 8%, transparent);
   }
 
   .sr {

@@ -14,9 +14,11 @@ interface Props {
   date: string;
   /** 采集到的 ETF 只数，用来判断沪深是不是都齐了 */
   total?: number;
+  /** 1 = 深市份额还没发布，这一版只有沪市数据 */
+  partial?: number;
 }
 
-const { date, total = 0 } = Astro.props;
+const { date, total = 0, partial = 0 } = Astro.props;
 
 /** 2026-11-25 → 11月25日 */
 const [, m, d] = date.split('-');
@@ -27,6 +29,7 @@ const label = `${Number(m)}月${Number(d)}日`;
   <div class="rs__line">
     <span class="rs__dot" data-dot></span>
     <strong class="rs__date" data-date-label>{label} 已更新</strong>
+    {partial ? <span class="rs__pending">深市待补</span> : null}
     {total > 0 && <span class="rs__count">{total} 只</span>}
     <span class="rs__sep">·</span>
     <span class="rs__state" data-state>正在检查抓取状态…</span>

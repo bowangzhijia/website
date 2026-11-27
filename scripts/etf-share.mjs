@@ -462,17 +462,30 @@ async function collectDay(date) {
   if (snap.warnings.length) console.log(`   ⚠ ${snap.warnings.join('；')}`);
 
   /*
-   * 完整性闸门：沪深任何一边明显缺失就不写盘。
+   * 完整性闸门：沪市必须齐，深市可以缺（缺就标注着先出）。
    *
    * 踩过的坑：沪市当天数据还没发布（返回 0 条）时，深市备源仍能拉到 580 只，
    * 合并后照样写盘，等于把「只有深市」的半截快照当成全市场数据，
-   * 下一次算份额变化会凭空造出巨额差异。宁可今天没数据，也不要脏数据。
+   * 下一次算份额变化会凭空造出巨额差异。所以沪市缺一律不写盘。
+   *
+   * 深市不一样：深交所官方口径是「T+1 盘前」公布，经常比沪市晚大半天。
+   * 等它等地黄花菜都凉了，所以改成——沪市齐了就先把这版发出去，
+   * 打上 partial 标记，页面上明确写「深市待次日补全」，第二天深市到了再整体覆盖。
+   * 这样当晚能看，数据也不会被当成完整的来用。
    */
   const MIN_PER_MARKET = 400;
-  if (shCount < MIN_PER_MARKET || szCount < MIN_PER_MARKET) {
-    console.warn(`   数据不完整（沪 ${shCount} / 深 ${szCount}，各需 ≥ ${MIN_PER_MARKET}），本次不写盘`);
+  if (shCount < MIN_PER_MARKET) {
+    console.warn(`   沪市只有 ${shCount} 只（需 ≥ ${MIN_PER_MARKET}），沪市没发布，本次不写盘`);
     return null;
   }
+
+  const szPartial = szCount < MIN_PER_MARKET;
+  if (szPartial) {
+    console.warn(
+      `   沪市 ${shCount} 只已齐，深市只有 ${szCount} 只（尚未发布）—— 先出沪市这一版，页面标注「深市待补」`
+    );
+  }
+  snap.partial = szPartial;
 
   // 补价格。拿不到不致命——榜单退化成只按份额变化率排，不显示金额
   const quotes = await fetchEmQuotes(snap.items);
@@ -914,6 +927,8 @@ function writeLatest(date, { prev, rows }, dates) {
     prevDate: prev,
     generatedAt: new Date().toISOString(),
     total: snap?.items.length || 0,
+    /** 1 = 深市还没发布，这一版只有沪市数据，页面要标出来 */
+    partial: snap?.partial ? 1 : 0,
     changed: rows.filter((r) => r.delta !== 0).length,
     inflowCount: rows.filter((r) => r.delta > 0).length,
     outflowCount: rows.filter((r) => r.delta < 0).length,
@@ -1623,8 +1638,9 @@ async function main() {
     if (snap) {
       if (args.article) generateArticle(d);
       await buildHistory();
-      // 复核成功后打个标记，同一天后面的几次触发直接跳过
-      if (args.refresh) markRefreshed(today);
+      // 复核成功后打个标记，同一天后面的几次触发直接跳过。
+      // 但深市还没齐的那版不算完成——第二天深市到了要能再抓一次把它补上。
+      if (args.refresh && !snap.partial) markRefreshed(today);
       return;
     }
     await sleep(1000);
