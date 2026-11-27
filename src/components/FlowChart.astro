@@ -292,8 +292,9 @@ const baskets: any[] = data?.baskets ?? [];
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
 
       /**
-       * 把某一天的信息拼成 HTML。
+       * 把某一天的信息拼成一行 HTML。
        * 桌面端给 tooltip 用，手机端给图外那个信息条用——同一份逻辑，两处展示。
+       * 文案尽量短：这一段是要挤在一行里的，多一个字就多一分折行的风险。
        */
       const infoHTML = (i: number): string => {
         const b = bars[i];
@@ -301,30 +302,30 @@ const baskets: any[] = data?.baskets ?? [];
 
         const parts: string[] = [`<b>${b.label}</b>`];
 
-        // 收盘价 + 涨跌幅
         if (b.c != null) {
           const prevC = i > 0 ? bars[i - 1].c : null;
           const chg = prevC ? ((b.c - prevC) / prevC) * 100 : null;
           const color = chg == null || chg === 0 ? '' : chg > 0 ? up : down;
-          parts.push(`收 <b${color ? ` style="color:${color}"` : ''}>${b.c.toFixed(2)}</b>`);
+          // 数字本身就是收盘价，省掉「收」字
+          parts.push(`<b${color ? ` style="color:${color}"` : ''}>${b.c.toFixed(2)}</b>`);
           if (chg != null) {
             parts.push(`<span style="color:${color || muted}">${chg > 0 ? '+' : ''}${chg.toFixed(2)}%</span>`);
           }
         }
 
-        // 篮子净流入 / 特殊情况说明
+        // 篮子名去掉「篮子」两个字，凑一行更容易
+        const shortName = basket?.name || '宽基合计';
         const f = b.flow;
         if (i > flowEnd) {
-          parts.push('<span style="opacity:.6">份额还没公布</span>');
+          parts.push('<span style="opacity:.6">份额未公布</span>');
         } else if (b.label < bStart) {
-          parts.push(`<span style="opacity:.6">份额记录从 ${bStart} 起</span>`);
+          parts.push(`<span style="opacity:.6">份额从 ${bStart} 起</span>`);
         } else if (f === 0) {
           parts.push('<span style="opacity:.6">份额无变动</span>');
         } else {
-          parts.push(`${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`);
+          parts.push(`${shortName} <b style="color:${f >= 0 ? up : down}">${sig(f)}亿</b>`);
         }
 
-        // 全部挤成一行，用全角空格分隔
         return parts.join('　');
       };
 
@@ -812,6 +813,8 @@ const baskets: any[] = data?.baskets ?? [];
   @media (max-width: 760px) {
     .fc__info {
       display: block;
+      font-size: 11px;
+      letter-spacing: -0.01em;
     }
   }
 
