@@ -702,14 +702,15 @@ function loadIndustries() {
  *  - 强度 = 净流入 / 行业 ETF 合计规模，用来横向比较（有色盘子 2600 亿、军工才 260 亿，
  *    只看净流入绝对值会天然偏向大盘子）
  */
-function computeIndustries(rows) {
+function computeIndustries(rows, excludeCodes) {
   const cfg = loadIndustries();
   const minScale = cfg.minScale || 10;
   const pool = rows.filter((r) => !r.b && r.sc >= minScale);
   console.log(`   [行业] 池子 ${pool.length} 只（规模≥${minScale}亿的非宽基）`);
 
   const out = [];
-  const used = new Set();
+  // 手工行业篮子（如创新药）先占位，避免同一批 ETF 被关键词再算一遍
+  const used = new Set(excludeCodes || []);
 
   for (const ind of cfg.industries) {
     const hit = pool.filter(
@@ -1079,7 +1080,10 @@ function writeLatest(date, { prev, rows }, dates) {
             sc: Math.round(m.s * 100) / 100,
           })),
       })),
-      ...computeIndustries(rows),
+      ...computeIndustries(
+        rows,
+        indBaskets.flatMap((b) => b.members.map((m) => m.c))
+      ),
     ],
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
