@@ -703,9 +703,11 @@ function loadIndustries() {
  *    只看净流入绝对值会天然偏向大盘子）
  */
 function computeIndustries(rows, excludeCodes) {
+  const skip = excludeCodes || new Set();
   const cfg = loadIndustries();
-  const minScale = cfg.minScale || 10;
-  const pool = rows.filter((r) => !r.b && r.sc >= minScale);
+  const minScale = cfg.minScale ?? 10;
+  // 不设规模门槛：小 ETF 也归进来，宁可多不可漏。只排除算不出规模的
+  const pool = rows.filter((r) => !skip.has(r.code) && r.sc > 0 && r.sc >= minScale);
   console.log(`   [行业] 池子 ${pool.length} 只（规模≥${minScale}亿的非宽基）`);
 
   const out = [];
@@ -1024,6 +1026,10 @@ function writeLatest(date, { prev, rows }, dates) {
 
   const allBaskets = computeBaskets(date, rows);
   const indBaskets = allBaskets.filter((b) => b.industry);
+  // 宽基成分不参与行业归类（成分横跨所有行业），行业篮子（创新药）除外
+  const wideCodes = new Set(
+    allBaskets.filter((b) => !b.industry).flatMap((b) => b.members.map((m) => m.c))
+  );
 
   const out = {
     date,
@@ -1066,7 +1072,7 @@ function writeLatest(date, { prev, rows }, dates) {
       // 手工指定的行业篮子（创新药）：成分代码是人工挑的，比关键词准。
       // 门槛和关键词聚合保持一致（规模 >= 10 亿），否则两个卡片口径对不上。
       ...indBaskets.map((b) => {
-        const kept = b.members.filter((m) => m.s >= 10);
+        const kept = b.members.filter((m) => m.s > 0);
         const flow = kept.reduce((s, m) => s + m.amt, 0);
         const scale = kept.reduce((s, m) => s + m.s, 0);
         return {
@@ -1087,9 +1093,9 @@ function writeLatest(date, { prev, rows }, dates) {
             })),
         };
       }),
-      ...computeIndustries(rows),
+      ...computeIndustries(rows, wideCodes),
     ].sort((a, b) => b.strength - a.strength),
-    bonds: computeBonds(rows, loadIndustries().minScale || 10),
+    bonds: computeBonds(rows, loadIndustries().minScale ?? 10, wideCodes),
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
       .map((r) => ({
@@ -1151,8 +1157,9 @@ const BOND_RULES = [
   { id: 'local', name: '地方债', kws: ['地方债'] },
 ];
 
-function computeBonds(rows, minScale) {
-  const pool = rows.filter((r) => !r.b && r.sc >= minScale && /债|国开|信用|转债|短融/.test(r.name));
+function computeBonds(rows, minScale, excludeCodes) {
+  const skip = excludeCodes || new Set();
+  const pool = rows.filter((r) => !skip.has(r.code) && r.sc > 0 && r.sc >= minScale && /债|国开|信用|转债|短融/.test(r.name));
   const out = [];
   const used = new Set();
 
