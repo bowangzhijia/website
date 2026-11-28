@@ -778,7 +778,17 @@ function computeBaskets(date, rows) {
       });
     }
     members.sort((x, y) => y.amt - x.amt || y.s - x.s);
-    return { id: b.id, name: b.name, desc: b.desc || '', n: members.length, delta, amount, scale, members };
+    return {
+      id: b.id,
+      name: b.name,
+      desc: b.desc || '',
+      industry: b.industry === true, // 标了 industry 的不进宽基区，改走行业卡片
+      n: members.length,
+      delta,
+      amount,
+      scale,
+      members,
+    };
   }).filter((b) => b.n > 0);
 }
 
@@ -1010,6 +1020,9 @@ function writeLatest(date, { prev, rows }, dates) {
   const pyi = (v) => Math.round(v / 1e6) / 100; // 份 → 亿份，2 位小数
   const inBasketCodes = new Set(loadBaskets().flatMap((b) => b.codes));
 
+  const allBaskets = computeBaskets(date, rows);
+  const indBaskets = allBaskets.filter((b) => b.industry);
+
   const out = {
     date,
     prevDate: prev,
@@ -1022,22 +1035,24 @@ function writeLatest(date, { prev, rows }, dates) {
     outflowCount: rows.filter((r) => r.delta < 0).length,
     netAmount: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) / 1e6) / 100,
     hasPrice: rows.some((r) => r.amount != null),
-    baskets: computeBaskets(date, rows).map((b) => ({
-      id: b.id,
-      name: b.name,
-      desc: b.desc,
-      n: b.n,
-      d: Math.round(b.delta / 1e6) / 100,
-      amt: Math.round(b.amount / 1e6) / 100,
-      s: Math.round(b.scale / 1e6) / 100,
-      members: b.members.map((m) => ({
-        c: m.c,
-        n: m.n,
-        s: Math.round(m.s * 100) / 100,
-        d: Math.round(m.d * 100) / 100,
-        amt: Math.round(m.amt * 100) / 100,
+    baskets: allBaskets
+      .filter((b) => !b.industry)
+      .map((b) => ({
+        id: b.id,
+        name: b.name,
+        desc: b.desc,
+        n: b.n,
+        d: Math.round(b.delta / 1e6) / 100,
+        amt: Math.round(b.amount / 1e6) / 100,
+        s: Math.round(b.scale / 1e6) / 100,
+        members: b.members.map((m) => ({
+          c: m.c,
+          n: m.n,
+          s: Math.round(m.s * 100) / 100,
+          d: Math.round(m.d * 100) / 100,
+          amt: Math.round(m.amt * 100) / 100,
+        })),
       })),
-    })),
     /*
      * 份额异动清单：只盯宽基篮子里的成分，份额单日变化 ≥11% 的列出来供人工核对。
      *
@@ -1045,7 +1060,27 @@ function writeLatest(date, { prev, rows }, dates) {
      * （建仓、巨额申赎），天天上榜反而盖住真正要看的那几只。
      * 宽基大额异动才值得逐个查公告。
      */
-    industries: computeIndustries(rows),
+    industries: [
+      // 手工指定的行业篮子（创新药）：成分代码是人工挑的，比关键词准
+      ...indBaskets.map((b) => ({
+        id: b.id,
+        name: b.name,
+        n: b.n,
+        flow: Math.round(b.amount / 1e6) / 100,
+        scale: Math.round(b.scale / 1e8),
+        strength:
+          b.scale > 0 ? Math.round(((b.amount / b.scale) * 100) * 100) / 100 : 0,
+        members: b.members
+          .sort((x, y) => y.amount - x.amount)
+          .map((m) => ({
+            c: m.c,
+            n: m.n,
+            amt: Math.round(m.amt * 100) / 100, // m.amt 已经是亿元
+            sc: Math.round(m.s * 100) / 100,
+          })),
+      })),
+      ...computeIndustries(rows),
+    ],
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
       .map((r) => ({
