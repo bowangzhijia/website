@@ -612,17 +612,33 @@ const baskets: any[] = data?.baskets ?? [];
             const comp = model.getComponent('grid', 0);
             const rect = comp?.coordinateSystem?.getRect?.();
             if (!rect || !rect.width) return;
-            if (x < rect.x || x > rect.x + rect.width) return;
 
-            const ratio = (x - rect.x) / rect.width;
+            /*
+             * 不卡在绘图区边缘做 return。
+             * grid 右侧还有 12px 内边距，手指点在最后一根柱子上时容易落到留白里，
+             * 之前那样直接 return 会表现为「点最右边没反应」。
+             * 改成把横坐标夹回 0～1，点在边缘时自然吸附到最近的一根。
+             */
+            const ratio = Math.min(1, Math.max(0, (x - rect.x) / rect.width));
             const total = labels.length;
             const dz = chart.getOption().dataZoom?.[0] || { start: 0, end: 100 };
             const s = Math.max(0, Math.min(100, Number(dz.start) || 0));
             const e = Math.max(s, Math.min(100, Number(dz.end) ?? 100));
             const from = Math.round((s / 100) * (total - 1));
             const to = Math.round((e / 100) * (total - 1));
-            const idx = Math.round(from + ratio * (to - from));
-            showAt(idx);
+
+            /*
+             * 注意 boundaryGap。
+             *
+             * 横轴是 category 且 boundaryGap: true，每根柱子占据宽度相等的一格、
+             * 住在格子正中，不是「点对点」落在刻度上。
+             * 所以要先算出可见范围内一共有几根，再按「第几格」取整——
+             * 直接按 (to-from) 线性插值会稳定偏半根，月K 上就表现为
+             * 点 10 月底却显示 10 月 16 号。
+             */
+            const n = to - from + 1;
+            const slot = Math.min(n - 1, Math.max(0, Math.floor(ratio * n)));
+            showAt(from + slot);
           };
 
           zr.on('click', onPoint);
