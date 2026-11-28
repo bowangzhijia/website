@@ -191,33 +191,55 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
               <div class="ind__head">
                 <h2 class="bk__h">行业资金流 <span class="blk__date">{data.date}</span></h2>
               </div>
-              <div class="ind__wrap">
-                <table class="ind__tb">
-                  <thead>
-                    <tr>
-                      <th>行业</th>
-                      <th class="r">ETF</th>
-                      <th class="r">规模(亿元)</th>
-                      <th class="r">净流入(亿元)</th>
-                      <th class="r">强度</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {industries.map((ind: any) => (
-                      <tr>
-                        <td class="ind__n">{ind.name}</td>
-                        <td class="r dim">{ind.n}</td>
-                        <td class="r dim">{ind.scale}</td>
-                        <td class={`r amt ${ind.flow > 0 ? 'up' : ind.flow < 0 ? 'down' : 'dim'}`}>
-                          {ind.flow > 0 ? '+' : ''}{ind.flow.toFixed(2)}
-                        </td>
-                        <td class={`r ${ind.strength > 0 ? 'up' : ind.strength < 0 ? 'down' : 'dim'}`}>
-                          {ind.strength > 0 ? '+' : ''}{ind.strength.toFixed(2)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div class="bk__grid">
+                {industries.map((ind: any) => (
+                  <details class="bk__card">
+                    <summary class="bk__sum">
+                      <div class="bk__name">
+                        {ind.name}
+                        <span class="bk__n">{ind.n} 只</span>
+                      </div>
+                      <div class={`bk__v ${ind.flow >= 0 ? 'up' : 'down'}`}>
+                        {n2(ind.flow)}
+                        <span class="bk__u">亿</span>
+                        {ind.scale > 0 && (
+                          <span class="bk__pct">
+                            {ind.flow >= 0 ? '+' : ''}
+                            {ind.strength.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <div class="bk__scale">
+                        行业规模 {ind.scale} 亿
+                        <span class="bk__more">点开看成分</span>
+                      </div>
+                    </summary>
+                    <div class="bk__tbwrap">
+                      <table class="bk__tb">
+                        <thead>
+                          <tr>
+                            <th>代码</th>
+                            <th>名称</th>
+                            <th class="r">净流入<span class="u">(亿元)</span></th>
+                            <th class="r">规模<span class="u">(亿元)</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(ind.members || []).map((m: any) => (
+                            <tr>
+                              <td class="code">{m.c}</td>
+                              <td class="nm">{m.n}</td>
+                              <td class={`r amt ${(m.amt ?? 0) > 0 ? 'up' : (m.amt ?? 0) < 0 ? 'down' : 'dim'}`}>
+                                {m.amt == null ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
+                              </td>
+                              <td class="r dim">{m.sc.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ))}
               </div>
             </section>
           )}
