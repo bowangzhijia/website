@@ -784,6 +784,7 @@ function computeBaskets(date, rows) {
       name: b.name,
       desc: b.desc || '',
       industry: b.industry === true, // 标了 industry 的不进宽基区，改走行业卡片
+      parent: b.parent || '', // 子行业归属，例如创新药属于医药
       n: members.length,
       delta,
       amount,
@@ -1062,28 +1063,31 @@ function writeLatest(date, { prev, rows }, dates) {
      * 宽基大额异动才值得逐个查公告。
      */
     industries: [
-      // 手工指定的行业篮子（创新药）：成分代码是人工挑的，比关键词准
-      ...indBaskets.map((b) => ({
-        id: b.id,
-        name: b.name,
-        n: b.n,
-        flow: Math.round(b.amount / 1e6) / 100,
-        scale: Math.round(b.scale / 1e8),
-        strength:
-          b.scale > 0 ? Math.round(((b.amount / b.scale) * 100) * 100) / 100 : 0,
-        members: b.members
-          .sort((x, y) => y.amount - x.amount)
-          .map((m) => ({
-            c: m.c,
-            n: m.n,
-            amt: Math.round(m.amt * 100) / 100, // m.amt 已经是亿元
-            sc: Math.round(m.s * 100) / 100,
-          })),
-      })),
-      ...computeIndustries(
-        rows,
-        indBaskets.flatMap((b) => b.members.map((m) => m.c))
-      ),
+      // 手工指定的行业篮子（创新药）：成分代码是人工挑的，比关键词准。
+      // 门槛和关键词聚合保持一致（规模 >= 10 亿），否则两个卡片口径对不上。
+      ...indBaskets.map((b) => {
+        const kept = b.members.filter((m) => m.s >= 10);
+        const flow = kept.reduce((s, m) => s + m.amt, 0);
+        const scale = kept.reduce((s, m) => s + m.s, 0);
+        return {
+          id: b.id,
+          name: b.name,
+          parent: b.parent || '',
+          n: kept.length,
+          flow: Math.round(flow * 100) / 100,
+          scale: Math.round(scale),
+          strength: scale > 0 ? Math.round((flow / scale) * 10000) / 100 : 0,
+          members: kept
+            .sort((x, y) => y.amt - x.amt)
+            .map((m) => ({
+              c: m.c,
+              n: m.n,
+              amt: Math.round(m.amt * 100) / 100,
+              sc: Math.round(m.s * 100) / 100,
+            })),
+        };
+      }),
+      ...computeIndustries(rows),
     ],
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))

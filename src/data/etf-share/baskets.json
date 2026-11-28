@@ -132,7 +132,8 @@
         "560900",
         "516060"
       ],
-      "industry": true
+      "industry": true,
+      "parent": "医药"
     },
     {
       "id": "us",

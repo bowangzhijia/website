@@ -211,6 +211,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                       </div>
                       <div class="bk__scale">
                         行业规模 {ind.scale} 亿
+                        {ind.parent ? <span class="ind__parent">含在{ind.parent}里</span> : null}
                         <span class="bk__more">点开看成分</span>
                       </div>
                     </summary>
@@ -443,6 +444,13 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .ind__tb .dim {
+    color: var(--muted);
+  }
+
+  /* 子行业的归属提示：告诉读者这个数字已经算在某个大类里了 */
+  .ind__parent {
+    margin-left: 6px;
+    font-size: 11px;
     color: var(--muted);
   }
 
