@@ -681,6 +681,69 @@ function loadBaskets() {
   }
 }
 
+/** 行业归类规则（配置文件在 src/data/etf-share/industries.json） */
+function loadIndustries() {
+  const p = join(DATA_DIR, 'industries.json');
+  if (!existsSync(p)) return { minScale: 10, industries: [] };
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'));
+  } catch {
+    return { minScale: 10, industries: [] };
+  }
+}
+
+/**
+ * 把 ETF 按行业聚合成资金流。
+ *
+ * 口径说明：
+ *  - 只用「规模 >= minScale 亿」的，小 ETF 一笔申赎就能让份额跳 10%，纯粹噪声
+ *  - 一只 ETF 只归一个行业（按规则顺序第一次命中），不做重复计入
+ *  - 宽基不参与归类：成分横跨所有行业，归到哪一类都是错的
+ *  - 强度 = 净流入 / 行业 ETF 合计规模，用来横向比较（有色盘子 2600 亿、军工才 260 亿，
+ *    只看净流入绝对值会天然偏向大盘子）
+ */
+function computeIndustries(rows) {
+  const cfg = loadIndustries();
+  const minScale = cfg.minScale || 10;
+  const pool = rows.filter((r) => !r.b && r.sc >= minScale);
+  console.log(`   [行业] 池子 ${pool.length} 只（规模≥${minScale}亿的非宽基）`);
+
+  const out = [];
+  const used = new Set();
+
+  for (const ind of cfg.industries) {
+    const hit = pool.filter(
+      (r) => !used.has(r.code) && ind.kws.some((k) => r.name.includes(k))
+    );
+    if (!hit.length) continue;
+
+    hit.forEach((r) => used.add(r.code));
+    // amount 单位是元，除以 1e8 才是亿元（和 baskets 那边的换算保持一致）
+    const flow = hit.reduce((s, r) => s + (r.amount || 0), 0) / 1e8;
+    const scale = hit.reduce((s, r) => s + (r.sc || 0), 0);
+
+    out.push({
+      id: ind.id,
+      name: ind.name,
+      n: hit.length,
+      flow: Math.round(flow * 100) / 100,
+      scale: Math.round(scale),
+      strength: scale > 0 ? Math.round((flow / scale) * 10000) / 100 : 0,
+      members: hit
+        .sort((a, b) => (b.amount || 0) - (a.amount || 0))
+        .map((r) => ({
+          c: r.code,
+          n: r.name,
+          amt: r.amount == null ? null : Math.round(r.amount / 1e6) / 100,
+          sc: Math.round(r.sc * 100) / 100,
+          p: +r.deltaPct.toFixed(2),
+        })),
+    });
+  }
+
+  return out.sort((a, b) => Math.abs(b.flow) - Math.abs(a.flow));
+}
+
 /**
  * 按指数归集。同一个指数下挂十几只 ETF，是同一份敞口——
  * 汇金买 510300 还是 510310 没有区别，分散在单只榜里根本看不出资金规模。
@@ -982,6 +1045,7 @@ function writeLatest(date, { prev, rows }, dates) {
      * （建仓、巨额申赎），天天上榜反而盖住真正要看的那几只。
      * 宽基大额异动才值得逐个查公告。
      */
+    industries: computeIndustries(rows),
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
       .map((r) => ({
@@ -1017,6 +1081,23 @@ function writeLatest(date, { prev, rows }, dates) {
   console.log(`   ✔ 已更新 latest.json（${out.rows.length} 行）`);
 }
 
+/**
+ * 刷新看板数据（latest.json），和文章无关。
+ *
+ * 之前这段逻辑埋在 generateArticle 里，所以一旦关掉文章生成，
+ * 看板数据也跟着不更新了——页面还显示前一天的数。
+ */
+function refreshBoard(date) {
+  const dates = listSnapshots();
+  const changes = computeChanges(date);
+  if (!changes.prev) {
+    console.log('   没有前一交易日的快照，看板数据跳过');
+    return false;
+  }
+  writeLatest(date, changes, dates);
+  return true;
+}
+
 function generateArticle(date) {
   const dates = listSnapshots();
   const changes = computeChanges(date);
@@ -1029,9 +1110,6 @@ function generateArticle(date) {
     console.log('   份额没有变动，本次不出文章');
     return null;
   }
-
-  // 看板数据每次都要刷新，哪怕文章早就写过了
-  writeLatest(date, changes, dates);
 
   const file = join(POSTS_DIR, `etf-share-${date}.md`);
   if (existsSync(file)) {
@@ -1641,6 +1719,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
+    refreshBoard(target);
     if (args.article) generateArticle(target);
     await buildHistory();
     return;
@@ -1667,6 +1746,7 @@ async function main() {
       console.log(`${today} 还没有数据（未发布或非交易日），等下一轮`);
       return;
     }
+    refreshBoard(today);
     if (args.article) generateArticle(today);
     await buildHistory();
     return;
@@ -1685,6 +1765,7 @@ async function main() {
     // 今天这一轮允许等一会儿（23 点那轮交易所可能还没发），往前的日子直接抓
     const snap = await collectDay(d);
     if (snap) {
+      refreshBoard(d);
       if (args.article) generateArticle(d);
       await buildHistory();
       // 复核成功后打个标记，同一天后面的几次触发直接跳过。

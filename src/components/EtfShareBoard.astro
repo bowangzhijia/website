@@ -88,6 +88,7 @@ const basketAmount = baskets.reduce((s: number, b: any) => s + (b.amt || 0), 0);
 
 /** 份额单日变化 ≥11% 的，列出来供人工核对（折算还是大额申赎，看公告才能定） */
 const anomalies: any[] = (data?.anomalies ?? []).slice(0, 30);
+const industries: any[] = data?.industries ?? [];
 
 const [, mm, dd] = (data?.date || '---- -- --').split('-');
 const dateLabel = mm ? `${Number(mm)}月${Number(dd)}日` : '';
@@ -177,8 +178,43 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
             </section>
           )}
 
-          {/* 份额异动清单：把 ≥11% 的全部摆出来，交给人工判断 */}
-          {anomalies.length > 0 && (
+          {industries.length > 0 && (
+            <section class="ind">
+              <div class="ind__head">
+                <h2 class="bk__h">行业资金流 <span class="blk__date">{data.date}</span></h2>
+              </div>
+              <div class="ind__wrap">
+                <table class="ind__tb">
+                  <thead>
+                    <tr>
+                      <th>行业</th>
+                      <th class="r">ETF</th>
+                      <th class="r">规模(亿元)</th>
+                      <th class="r">净流入(亿元)</th>
+                      <th class="r">强度</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {industries.map((ind: any) => (
+                      <tr>
+                        <td class="ind__n">{ind.name}</td>
+                        <td class="r dim">{ind.n}</td>
+                        <td class="r dim">{ind.scale}</td>
+                        <td class={`r amt ${ind.flow > 0 ? 'up' : ind.flow < 0 ? 'down' : 'dim'}`}>
+                          {ind.flow > 0 ? '+' : ''}{ind.flow.toFixed(2)}
+                        </td>
+                        <td class={`r ${ind.strength > 0 ? 'up' : ind.strength < 0 ? 'down' : 'dim'}`}>
+                          {ind.strength > 0 ? '+' : ''}{ind.strength.toFixed(2)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* 份额异动清单：把 ≥11% 的全部摆出来，交给人工判断 */}          {anomalies.length > 0 && (
             <details class="an" open>
               <summary class="an__sum">
                 <span class="an__ttl">份额异动清单 <span class="blk__date">{data.date}</span></span>
@@ -326,6 +362,87 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 </script>
 
 <style>
+  /* ===== 行业资金流 ===== */
+  .ind {
+    margin-bottom: 30px;
+  }
+
+  .ind__head {
+    margin-bottom: 10px;
+  }
+
+  .ind__wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .ind__tb {
+    width: 100%;
+    min-width: 340px;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .ind__tb th,
+  .ind__tb td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--hairline);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .ind__tb th {
+    background: var(--thead-fill);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .ind__tb tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .ind__tb .r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ind__tb .amt {
+    font-weight: 700;
+  }
+
+  .ind__tb .dim {
+    color: var(--muted);
+  }
+
+  .ind__n {
+    font-weight: 600;
+  }
+
+  @media (max-width: 560px) {
+    .ind__tb {
+      font-size: 10.5px;
+      table-layout: fixed;
+    }
+
+    .ind__tb th,
+    .ind__tb td {
+      padding: 5px 4px;
+    }
+
+    .ind__tb th {
+      font-size: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .ind__tb th:nth-child(1), .ind__tb td:nth-child(1) { width: 22%; }
+    .ind__tb th:nth-child(2), .ind__tb td:nth-child(2) { width: 12%; }
+    .ind__tb th:nth-child(3), .ind__tb td:nth-child(3) { width: 22%; }
+    .ind__tb th:nth-child(4), .ind__tb td:nth-child(4) { width: 24%; }
+    .ind__tb th:nth-child(5), .ind__tb td:nth-child(5) { width: 20%; }
+  }
+
   .sc {
     padding: 28px 0 calc(48px + var(--tabbar-h, 0px));
   }
