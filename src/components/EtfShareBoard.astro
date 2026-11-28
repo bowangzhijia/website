@@ -190,7 +190,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {industries.length > 0 && (
             <section class="ind">
               <div class="ind__head">
-                <h2 class="bk__h">行业资金流 <span class="blk__date">{data.date}</span></h2>
+                <h2 class="bk__h">行业篮子 <span class="blk__date">{data.date}</span></h2>
               </div>
               <div class="bk__grid">
                 {industries.map((ind: any) => (
@@ -249,7 +249,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {bonds.length > 0 && (
             <section class="ind">
               <div class="ind__head">
-                <h2 class="bk__h">债券资金流 <span class="blk__date">{data.date}</span></h2>
+                <h2 class="bk__h">债券篮子 <span class="blk__date">{data.date}</span></h2>
               </div>
               <div class="bk__grid">
                 {bonds.map((bd: any) => (
