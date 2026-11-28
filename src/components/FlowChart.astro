@@ -593,13 +593,36 @@ const baskets: any[] = data?.baskets ?? [];
 
           const onPoint = (ev: any) => {
             if (window.innerWidth > 760) return; // 桌面走鼠标悬浮
+
             const x = ev.offsetX;
             const y = ev.offsetY;
-            if (!chart.containPixel({ gridIndex: 0 }, [x, y]) && !chart.containPixel({ gridIndex: 1 }, [x, y])) {
-              return;
-            }
-            const at = Math.round(chart.convertFromPixel({ xAxisIndex: 0 }, x) as number);
-            showAt(at);
+
+            /*
+             * 自己算索引，不调 convertFromPixel。
+             *
+             * 这套图是「两个 grid + dataZoom + 多 series」，convertFromPixel 和
+             * findHover 在缩放状态下都会算偏（点 2026 年返回 1998 年）。
+             * 这里退回到最朴素的换算：
+             *   1. 取第一个 grid 的像素矩形
+             *   2. 算出点击位置在矩形里的横向占比
+             *   3. 用 dataZoom 的起止百分比换算成数据索引
+             * 不依赖任何 ECharts 内部状态，缩放后也准。
+             */
+            const model = chart.getModel();
+            const comp = model.getComponent('grid', 0);
+            const rect = comp?.coordinateSystem?.getRect?.();
+            if (!rect || !rect.width) return;
+            if (x < rect.x || x > rect.x + rect.width) return;
+
+            const ratio = (x - rect.x) / rect.width;
+            const total = labels.length;
+            const dz = chart.getOption().dataZoom?.[0] || { start: 0, end: 100 };
+            const s = Math.max(0, Math.min(100, Number(dz.start) || 0));
+            const e = Math.max(s, Math.min(100, Number(dz.end) ?? 100));
+            const from = Math.round((s / 100) * (total - 1));
+            const to = Math.round((e / 100) * (total - 1));
+            const idx = Math.round(from + ratio * (to - from));
+            showAt(idx);
           };
 
           zr.on('click', onPoint);
@@ -633,7 +656,7 @@ const baskets: any[] = data?.baskets ?? [];
               /\.\d+$/,
               ''
             )} 亿</strong></span>` +
-            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`;
+            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${i1 - i0 + 1} 根）</span>`;
           return;
         }
 
@@ -645,7 +668,7 @@ const baskets: any[] = data?.baskets ?? [];
               /\.\d+$/,
               ''
             )} 亿</strong></span>` +
-            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${bars.length} 根）</span>`
+            `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}（${i1 - i0 + 1} 根）</span>`
           : `<span class="dim">这一段只有 K 线，这个篮子的份额记录从 ${bStart} 起</span>` +
             `<span class="dim">${bars[i0]?.label} ~ ${bars[i1]?.label}</span>`;
       }
