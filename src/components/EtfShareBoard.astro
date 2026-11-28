@@ -153,7 +153,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {baskets.length > 0 && (
             <section class="bk">
               <div class="bk__head">
-                <h2 class="bk__h">指数篮子</h2>
+                <h2 class="bk__h">指数篮子 <span class="blk__date">{data.date}</span></h2>
                 <p class="bk__sub">
                   一个指数挂十几只 ETF，是同一份敞口。汇金买哪只都一样，加总才看得出进了多少钱。
                   点开任意一个能看成分明细；最后一个「创新药」是主题篮子，港股占六成。
@@ -219,7 +219,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {anomalies.length > 0 && (
             <details class="an" open>
               <summary class="an__sum">
-                <span class="an__ttl">份额异动清单</span>
+                <span class="an__ttl">份额异动清单 <span class="blk__date">{data.date}</span></span>
                 <span class="an__n">{anomalies.length} 只</span>
                 <span class="an__more"></span>
               </summary>
@@ -303,21 +303,21 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
           {inflow.length > 0 && (
             <section class="blk">
-              <h2 class="blk__h">净申购 TOP 12</h2>
+              <h2 class="blk__h">净申购 TOP 12 <span class="blk__date">{data.date}</span></h2>
               <ShareTable rows={inflow} hasPrice={hasPrice} showStreak />
             </section>
           )}
 
           {outflow.length > 0 && (
             <section class="blk">
-              <h2 class="blk__h">净赎回 TOP 12</h2>
+              <h2 class="blk__h">净赎回 TOP 12 <span class="blk__date">{data.date}</span></h2>
               <ShareTable rows={outflow} hasPrice={hasPrice} showStreak />
             </section>
           )}
 
           {upRedeem.length > 0 && (
             <section class="blk">
-              <h2 class="blk__h">涨了，份额却在减</h2>
+              <h2 class="blk__h">涨了，份额却在减 <span class="blk__date">{data.date}</span></h2>
               <p class="blk__tip">价格涨、份额降，有资金借着上涨离场。只列 5 亿元以上的。</p>
               <ShareTable rows={upRedeem} hasPrice={hasPrice} />
             </section>
@@ -325,17 +325,9 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
           {downBuy.length > 0 && (
             <section class="blk">
-              <h2 class="blk__h">跌了，份额反而增</h2>
+              <h2 class="blk__h">跌了，份额反而增 <span class="blk__date">{data.date}</span></h2>
               <p class="blk__tip">价格跌、份额涨，是逆势抄底的动作。只列 5 亿元以上的。</p>
               <ShareTable rows={downBuy} hasPrice={hasPrice} showStreak />
-            </section>
-          )}
-
-          {streak.length > 0 && (
-            <section class="blk">
-              <h2 class="blk__h">连续净申购 3 天以上</h2>
-              <p class="blk__tip">连着几天都在被买，比单日的猛增更值得留意。</p>
-              <ShareTable rows={streak} hasPrice={hasPrice} showStreak />
             </section>
           )}
 
@@ -829,6 +821,15 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   .blk__h {
     margin: 0 0 10px;
     font-size: 17px;
+  }
+
+  /* 标题后面的数据日期，弱化处理，别抢标题的视觉重量 */
+  .blk__date {
+    margin-left: 7px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .blk__tip {
