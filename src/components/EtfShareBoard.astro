@@ -142,14 +142,13 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                             只看金额会误判成"大盘买得多"，摊到规模上才看得出谁更猛 */}
                         {b.s > 0 && (
                           <span class="bk__pct">
-                            {b.amt >= 0 ? '+' : ''}
-                            {((b.amt / b.s) * 100).toFixed(2)}%
+                            {((b.amt / b.s) * 100).toFixed(2) >= 0 ? '+' : ''}{((b.amt / b.s) * 100).toFixed(2)}%
                           </span>
                         )}
                       </div>
                       <div class="bk__scale">
                         篮子规模 {Math.round(b.s)} 亿
-                        <span class="bk__more">点开看成分</span>
+                        
                       </div>
                     </summary>
                     {/* 手机屏幕窄，四列放不下，套一层横向滚动而不是让它顶出卡片 */}
@@ -205,15 +204,14 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         <span class="bk__u">亿</span>
                         {ind.scale > 0 && (
                           <span class="bk__pct">
-                            {ind.flow >= 0 ? '+' : ''}
-                            {ind.strength.toFixed(2)}%
+                            {ind.strength >= 0 ? '+' : ''}{ind.strength.toFixed(2)}%
                           </span>
                         )}
                       </div>
                       <div class="bk__scale">
                         行业规模 {ind.scale} 亿
                         {ind.parent ? <span class="ind__parent">含在{ind.parent}里</span> : null}
-                        <span class="bk__more">点开看成分</span>
+                        
                       </div>
                     </summary>
                     <div class="bk__tbwrap">
@@ -264,14 +262,13 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         <span class="bk__u">亿</span>
                         {bd.scale > 0 && (
                           <span class="bk__pct">
-                            {bd.flow >= 0 ? '+' : ''}
-                            {bd.strength.toFixed(2)}%
+                            {bd.strength >= 0 ? '+' : ''}{bd.strength.toFixed(2)}%
                           </span>
                         )}
                       </div>
                       <div class="bk__scale">
                         规模 {bd.scale} 亿
-                        <span class="bk__more">点开看成分</span>
+                        
                       </div>
                     </summary>
                     <div class="bk__tbwrap">
@@ -660,12 +657,12 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   .bk__grid {
     display: grid;
     /* 篮子从 6 个变 7 个，写死 3 列会让最后一行只剩一个，改成自适应 */
-    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+    gap: 7px;
   }
 
   .bk__card {
-    padding: 14px 16px;
+    padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card-bg);
@@ -746,10 +743,10 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   .bk__name {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    font-size: 14px;
+    gap: 5px;
+    font-size: 12px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 3px;
   }
 
   /* 强度百分比：跟在大字金额后面，小一号，别抢主数字的注意力 */
@@ -768,7 +765,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .bk__v {
-    font-size: 24px;
+    font-size: 17px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -782,8 +779,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .bk__scale {
-    margin-top: 6px;
-    font-size: 12px;
+    margin-top: 2px;
+    font-size: 10.5px;
     color: var(--muted);
   }
 
@@ -1014,7 +1011,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     }
 
     .bk__grid {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
     }
 
     .sc__title {
@@ -1132,11 +1130,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     }
 
     .bk__name {
-      font-size: 13px;
+      font-size: 11px;
     }
 
     .bk__v {
-      font-size: 20px;
+      font-size: 15px;
     }
 
     /* 手机上不用横向滑动：靠缩小字号 + 固定布局，把四列完整塞进一屏 */
