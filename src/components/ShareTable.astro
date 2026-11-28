@@ -74,7 +74,7 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    min-width: 420px;
+    min-width: 340px;
   }
 
   th,
@@ -160,6 +160,11 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
     th,
     td {
       padding: 5px 7px;
+    }
+
+    /* 名称太宽会把后面两列顶出可视区，窄屏收到 118px 用省略号 */
+    .nm {
+      max-width: 118px;
     }
   }
 </style>
