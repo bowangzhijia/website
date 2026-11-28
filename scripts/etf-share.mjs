@@ -742,7 +742,7 @@ function computeIndustries(rows, excludeCodes) {
     });
   }
 
-  return out.sort((a, b) => b.scale - a.scale);
+  return out.sort((a, b) => b.strength - a.strength);
 }
 
 /**
@@ -1088,7 +1088,7 @@ function writeLatest(date, { prev, rows }, dates) {
         };
       }),
       ...computeIndustries(rows),
-    ].sort((a, b) => b.scale - a.scale),
+    ].sort((a, b) => b.strength - a.strength),
     bonds: computeBonds(rows, loadIndustries().minScale || 10),
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
@@ -1179,7 +1179,7 @@ function computeBonds(rows, minScale) {
         })),
     });
   }
-  return out.sort((a, b) => b.scale - a.scale);
+  return out.sort((a, b) => b.strength - a.strength);
 }
 
 function refreshBoard(date) {
