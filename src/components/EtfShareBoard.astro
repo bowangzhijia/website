@@ -147,7 +147,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         )}
                       </div>
                       <div class="bk__scale">
-                        篮子规模 {Math.round(b.s)} 亿
+                        规模 {Math.round(b.s)} 亿
                         
                       </div>
                     </summary>
@@ -209,7 +209,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         )}
                       </div>
                       <div class="bk__scale">
-                        行业规模 {ind.scale} 亿
+                        规模 {ind.scale} 亿
                         {ind.parent ? <span class="ind__parent">含在{ind.parent}里</span> : null}
                         
                       </div>
@@ -657,12 +657,12 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   .bk__grid {
     display: grid;
     /* 篮子从 6 个变 7 个，写死 3 列会让最后一行只剩一个，改成自适应 */
-    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
-    gap: 7px;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 6px;
   }
 
   .bk__card {
-    padding: 8px 10px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card-bg);
@@ -674,7 +674,11 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     border-color: var(--accent-border);
   }
 
+  /* 一行横排：名称 → 金额 → 强度 → 规模，不换行 */
   .bk__sum {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
     cursor: pointer;
     list-style: none;
   }
@@ -744,9 +748,14 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     display: flex;
     align-items: baseline;
     gap: 5px;
-    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
     font-weight: 600;
-    margin-bottom: 3px;
+    margin-bottom: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* 强度百分比：跟在大字金额后面，小一号，别抢主数字的注意力 */
@@ -765,7 +774,9 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .bk__v {
-    font-size: 17px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 15px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -779,8 +790,10 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .bk__scale {
-    margin-top: 2px;
-    font-size: 10.5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    margin-top: 0;
+    font-size: 11px;
     color: var(--muted);
   }
 
@@ -1010,9 +1023,10 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       grid-template-columns: repeat(2, 1fr);
     }
 
+    /* 一行要放得下「名称 + 笔数 + 金额 + 百分比 + 规模」，手机只能单列 */
     .bk__grid {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      grid-template-columns: 1fr;
+      gap: 5px;
     }
 
     .sc__title {
