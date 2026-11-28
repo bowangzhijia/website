@@ -369,21 +369,34 @@ const baskets: any[] = data?.baskets ?? [];
              */
             confine: false,
             /*
-             * 浮框贴着图表容器底部外侧显示，正落在图下方那条信息带的位置。
+             * 浮框固定落在两个 grid 之间的空挡里（K 线下方、资金流柱子上方）。
              *
-             * 不设 appendToBody —— 那样坐标会变成文档坐标，还得手动补滚动量。
-             * 保持浮框挂在图表容器里，position 直接返回「容器底部再往下一点」，
-             * 容器没有 overflow:hidden，浮框可以正常溢出到外面。
-             * 索引仍然完全由 ECharts 算（和电脑版同一条路）。
+             * 之前桌面端跟着鼠标走，靠右边时会顶出屏幕；手机上则贴在顶部压住 K 线。
+             * 现在两端统一：横向居中（并夹住左右边界，绝不溢出），纵向放在空挡中间。
+             * 索引仍完全由 ECharts 计算，和之前判断「点的是哪一根」的逻辑一致。
              */
             position: (point: any, params: any, dom: any, rect: any, size: any) => {
-              if (window.innerWidth > 760) return [point[0] + 14, point[1] + 14];
-              return [8, size.viewSize[1] + 6];
+              const vw = size.viewSize[0];
+              const vh = size.viewSize[1];
+              const cw = size.contentSize[0];
+              const ch = size.contentSize[1];
+
+              // 空挡是 56% ~ 64%
+              const gapTop = vh * 0.56;
+              const gapBottom = vh * 0.64;
+              const gapH = gapBottom - gapTop;
+
+              let y = gapTop + Math.max(0, (gapH - ch) / 2);
+              if (ch > gapH) y = Math.max(gapTop - 4, gapTop); // 放不下就贴空挡上沿
+
+              // 左右都留 6px，宽了也不许出界
+              const x = Math.min(Math.max(6, (vw - cw) / 2), Math.max(6, vw - cw - 6));
+              return [x, y];
             },
             extraCssText:
-              window.innerWidth > 760
-                ? 'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);'
-                : 'padding: 8px 11px; border-radius: 10px; font-size: 11px; line-height: 1.6; white-space: nowrap; box-shadow: none; max-width: 92vw;',
+              'max-width: calc(100% - 12px); padding: 6px 10px; border-radius: 8px; ' +
+              'font-size: 11px; line-height: 1.5; white-space: nowrap; overflow: hidden; ' +
+              'text-overflow: ellipsis; box-shadow: 0 2px 8px rgba(0,0,0,.12);',
             axisPointer: {
               // 手机上只要一条竖线，跟着点的地方走；桌面保留十字线
               type: window.innerWidth > 760 ? 'cross' : 'line',
@@ -405,9 +418,16 @@ const baskets: any[] = data?.baskets ?? [];
            * 表现为"下面那部分显示不全"。
            * 改成百分比后，不管画布多高都会按比例铺满。
            */
+          /*
+           * 两个 grid 之间刻意留出 8% 的空挡（56%~64%）。
+           *
+           * 上边是 K 线、下边是资金流柱子，中间这条空白正好放浮框：
+           * 既不压价格，也不压柱子，还不会跑到容器外面去。
+           * 手机端空挡高度约 26px，刚好够一行字。
+           */
           grid: [
-            { left: 46, right: 12, top: 12, height: '50%' },
-            { left: 46, right: 12, top: '68%', height: '22%' },
+            { left: 46, right: 12, top: 10, height: '46%' },
+            { left: 46, right: 12, top: '64%', height: '24%' },
           ],
           xAxis: [
             {
