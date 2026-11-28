@@ -304,7 +304,8 @@
    * 普通 scoped 规则根本匹配不上——这是这个项目已经踩过的坑。
    */
   :global(.ft__tb th) {
-    background: var(--thead-fill);
+    background: linear-gradient(var(--thead-fill), var(--thead-fill)), var(--surface);
+    background-color: var(--surface);
     color: var(--muted);
     font-size: 12px;
     font-weight: 600;
@@ -322,13 +323,14 @@
   :global(.ft__tb td:first-child) {
     position: sticky;
     left: 0;
-    background: var(--surface);
+    background-color: var(--surface);
     z-index: 1;
   }
 
   :global(.ft__tb th:first-child) {
     z-index: 3;
-    background: var(--thead-fill);
+    background: linear-gradient(var(--thead-fill), var(--thead-fill)), var(--surface);
+    background-color: var(--surface);
   }
 
   .ft__tb .r {

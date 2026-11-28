@@ -1579,13 +1579,14 @@ async function buildHistory(deepBars = 0, fromDate = null, toDate = null, skipKl
 // ============================================================
 
 function parseArgs() {
-  const out = { date: null, days: 1, article: true, force: false, deep: 0, refresh: false };
+  const out = { date: null, days: 1, article: false, force: false, deep: 0, refresh: false };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--date=')) out.date = a.slice(7);
     else if (a.startsWith('--days=')) out.days = Number(a.slice(7)) || 1;
     else if (a.startsWith('--deep=')) out.deep = Number(a.slice(7)) || 0;
     else if (a.startsWith('--from=')) out.from = a.slice(7);
     else if (a.startsWith('--to=')) out.to = a.slice(5);
+    else if (a === '--article') out.article = true;
     else if (a === '--no-article') out.article = false;
     else if (a === '--force') out.force = true;
     else if (a === '--no-kline') out.nokline = true;
