@@ -67,7 +67,7 @@ const baskets: any[] = data?.baskets ?? [];
       <div class="fc__canvas" data-canvas />
 
       {/* 手机上把当天信息显示在图外，避免遮挡 K 线 */}
-      <div class="fc__info" data-info></div>
+
 
       <p class="fc__note" data-note />
     </section>
@@ -548,18 +548,6 @@ const baskets: any[] = data?.baskets ?? [];
         updateLegend();
       });
 
-      /*
-       * 图下方那条信息带只当「占位锚点」用：
-       * 手机上的 tooltip 会被定位到它的位置（见 option 里的 position），
-       * 所以平时保持一行提示，有交互时由浮框盖在上面显示读数。
-       */
-      const infoEl = root.querySelector('[data-info]') as HTMLElement | null;
-      if (infoEl && !infoEl.dataset.ready) {
-        infoEl.dataset.ready = '1';
-        infoEl.classList.add('fc__info--idle');
-        infoEl.textContent = '点一下图表，这里显示当天数据';
-      }
-
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
       note.textContent = `柱子 = ${label} 每日净流入合计，份额记录从 ${dates[flowStart] || '2016 年'} 开始`;
       updateLegend();
@@ -778,32 +766,6 @@ const baskets: any[] = data?.baskets ?? [];
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
-  }
-
-  /* 手机端的图外信息条：桌面端用 tooltip，这里不占地方 */
-  .fc__info {
-    display: none;
-    margin-top: 8px;
-    padding: 8px 11px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--text);
-    min-height: 34px;
-  }
-
-  .fc__info--idle {
-    color: var(--muted);
-  }
-
-  @media (max-width: 760px) {
-    .fc__info {
-      display: block;
-      font-size: 11px;
-      letter-spacing: -0.01em;
-    }
   }
 
   .fc__note {
