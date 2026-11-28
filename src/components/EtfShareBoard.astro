@@ -116,29 +116,6 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
       {data && (
         <>
-          <div class="stats">
-            <div class="stat">
-              <span class="stat__k">净申购</span>
-              <strong class="stat__v up">{data.inflowCount}</strong>
-              <span class="stat__u">只</span>
-            </div>
-            <div class="stat">
-              <span class="stat__k">净赎回</span>
-              <strong class="stat__v down">{data.outflowCount}</strong>
-              <span class="stat__u">只</span>
-            </div>
-            <div class="stat">
-              <span class="stat__k">合计净流入</span>
-              <strong class={`stat__v ${data.netAmount >= 0 ? 'up' : 'down'}`}>{n2(data.netAmount)}</strong>
-              <span class="stat__u">亿元</span>
-            </div>
-            <div class="stat">
-              <span class="stat__k">覆盖</span>
-              <strong class="stat__v">{data.total}</strong>
-              <span class="stat__u">只 ETF</span>
-            </div>
-          </div>
-
           {history && <FlowChart data={history} />}
           {history && <FlowTable />}
 
