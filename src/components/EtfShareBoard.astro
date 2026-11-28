@@ -233,29 +233,26 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                       <th>代码</th>
                       <th>名称</th>
                       <th class="r">份额变化</th>
-                      <th class="r">涨跌幅</th>
-                      <th class="r">规模(亿)</th>
-                      <th class="r">净流入(亿)</th>
-                      <th>判定</th>
+                      <th class="r">净流入(亿元)</th>
+                      <th class="r">规模(亿元)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {anomalies.map((a: any) => (
                       <tr>
                         <td class="code">{a.c}</td>
-                        <td class="nm">{a.n}</td>
+                        <td class="nm">
+                          {a.n}
+                          {a.sp ? <span class="an__badge is-split">疑似折算</span> : null}
+                        </td>
                         <td class={`r amt ${a.p > 0 ? 'up' : 'down'}`}>
                           {a.p > 0 ? '+' : ''}
                           {a.p}%
                         </td>
-                        <td class="r dim">{a.chg == null ? '—' : (a.chg > 0 ? '+' : '') + a.chg + '%'}</td>
-                        <td class="r dim">{a.sc}</td>
                         <td class={`r amt ${a.amt == null ? 'dim' : a.amt > 0 ? 'up' : a.amt < 0 ? 'down' : 'dim'}`}>
                           {a.amt == null ? '—' : (a.amt > 0 ? '+' : '') + a.amt}
                         </td>
-                        <td class="an__tag">
-                          {a.sp ? <span class="an__badge is-split">疑似折算</span> : <span class="an__badge">正常申赎</span>}
-                        </td>
+                        <td class="r dim">{a.sc}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -700,7 +697,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
   .an__tb {
     width: 100%;
-    min-width: 540px;
+    min-width: 440px;
     border-collapse: collapse;
     font-size: 13px;
   }
@@ -745,6 +742,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
   }
 
   .an__badge {
+    margin-left: 4px;
     padding: 1px 7px;
     border: 1px solid var(--border);
     border-radius: 999px;
