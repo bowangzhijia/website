@@ -860,8 +860,63 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     }
 
     .an__tb {
-      font-size: 11.5px;
+      font-size: 10.5px;
     }
+
+    /* 异动清单和搜索表照搬篮子那套：固定布局 + 百分比列宽，四列一屏放下 */
+    .an__wrap,
+    .sr__wrap {
+      overflow-x: visible;
+    }
+
+    .an__tb,
+    .sr__table {
+      min-width: 0;
+      table-layout: fixed;
+      font-size: 10.5px;
+    }
+
+    .an__tb th:nth-child(1), .an__tb td:nth-child(1),
+    .sr__table th:nth-child(1), .sr__table td:nth-child(1) {
+      width: 19%;
+    }
+
+    .an__tb th:nth-child(2), .an__tb td:nth-child(2),
+    .sr__table th:nth-child(2), .sr__table td:nth-child(2) {
+      width: 31%;
+    }
+
+    .an__tb th:nth-child(3), .an__tb td:nth-child(3),
+    .sr__table th:nth-child(3), .sr__table td:nth-child(3) {
+      width: 28%;
+    }
+
+    .an__tb th:nth-child(4), .an__tb td:nth-child(4),
+    .sr__table th:nth-child(4), .sr__table td:nth-child(4) {
+      width: 22%;
+    }
+
+    .an__tb th,
+    .an__tb td,
+    .sr__table th,
+    .sr__table td {
+      padding: 5px 3px;
+    }
+
+    .an__tb th,
+    .sr__table th {
+      font-size: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .an__tb .nm,
+    .sr__table td:nth-child(2) {
+      max-width: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
 
     .an__tb th,
     .an__tb td {
