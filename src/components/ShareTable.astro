@@ -41,7 +41,6 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
         <th>名称</th>
         <th class="r">净流入(亿元)</th>
         <th class="r">规模(亿元)</th>
-        <th class="r">份额变化</th>
       </tr>
     </thead>
     <tbody>
@@ -56,7 +55,6 @@ const tone = (v: number | null) => (v == null || v === 0 ? '' : v > 0 ? 'up' : '
             </td>
             <td class={`r amt ${tone(r.amt)}`}>{sign(r.amt)}</td>
             <td class="r dim">{r.sc != null ? r.sc.toFixed(1) : '—'}</td>
-            <td class={`r ${tone(r.p)}`}>{sign(r.p, 2, '%')}</td>
           </tr>
         ))
       }
