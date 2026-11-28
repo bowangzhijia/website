@@ -1089,6 +1089,7 @@ function writeLatest(date, { prev, rows }, dates) {
       }),
       ...computeIndustries(rows),
     ],
+    bonds: computeBonds(rows, loadIndustries().minScale || 10),
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
       .map((r) => ({
@@ -1130,6 +1131,57 @@ function writeLatest(date, { prev, rows }, dates) {
  * 之前这段逻辑埋在 generateArticle 里，所以一旦关掉文章生成，
  * 看板数据也跟着不更新了——页面还显示前一天的数。
  */
+
+/**
+ * 债券 ETF 按品种归类。
+ *
+ * 单独一块，不和行业混：债券的资金进出反映的是利率和信用环境，
+ * 和半导体被买了还是卖了完全是两回事。
+ * 品种内部的流向反而有用——钱从信用债跑到国债，就是避险。
+ */
+const BOND_RULES = [
+  { id: 'short', name: '短融', kws: ['短融'] },
+  { id: 'techbond', name: '科创债', kws: ['科创债'] },
+  { id: 'gov', name: '国债', kws: ['国债'] },
+  { id: 'policy', name: '政金债', kws: ['政金', '国开'] },
+  { id: 'corp', name: '公司债', kws: ['公司债'] },
+  { id: 'credit', name: '信用债', kws: ['信用'] },
+  { id: 'convert', name: '可转债', kws: ['转债'] },
+  { id: 'city', name: '城投债', kws: ['城投'] },
+  { id: 'local', name: '地方债', kws: ['地方债'] },
+];
+
+function computeBonds(rows, minScale) {
+  const pool = rows.filter((r) => !r.b && r.sc >= minScale && /债|国开|信用|转债|短融/.test(r.name));
+  const out = [];
+  const used = new Set();
+
+  for (const b of BOND_RULES) {
+    const hit = pool.filter((r) => !used.has(r.code) && b.kws.some((k) => r.name.includes(k)));
+    if (!hit.length) continue;
+    hit.forEach((r) => used.add(r.code));
+    const flow = hit.reduce((s, r) => s + (r.amount || 0), 0) / 1e8;
+    const scale = hit.reduce((s, r) => s + (r.sc || 0), 0);
+    out.push({
+      id: b.id,
+      name: b.name,
+      n: hit.length,
+      flow: Math.round(flow * 100) / 100,
+      scale: Math.round(scale),
+      strength: scale > 0 ? Math.round((flow / scale) * 10000) / 100 : 0,
+      members: hit
+        .sort((a, b2) => (b2.amount || 0) - (a.amount || 0))
+        .map((r) => ({
+          c: r.code,
+          n: r.name,
+          amt: r.amount == null ? null : Math.round(r.amount / 1e6) / 100,
+          sc: Math.round(r.sc * 100) / 100,
+        })),
+    });
+  }
+  return out.sort((a, b) => b.scale - a.scale);
+}
+
 function refreshBoard(date) {
   const dates = listSnapshots();
   const changes = computeChanges(date);

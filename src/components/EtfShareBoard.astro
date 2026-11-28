@@ -89,6 +89,7 @@ const basketAmount = baskets.reduce((s: number, b: any) => s + (b.amt || 0), 0);
 /** 份额单日变化 ≥11% 的，列出来供人工核对（折算还是大额申赎，看公告才能定） */
 const anomalies: any[] = (data?.anomalies ?? []).slice(0, 30);
 const industries: any[] = data?.industries ?? [];
+const bonds: any[] = data?.bonds ?? [];
 
 const [, mm, dd] = (data?.date || '---- -- --').split('-');
 const dateLabel = mm ? `${Number(mm)}月${Number(dd)}日` : '';
@@ -227,6 +228,64 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                         </thead>
                         <tbody>
                           {(ind.members || []).map((m: any) => (
+                            <tr>
+                              <td class="code">{m.c}</td>
+                              <td class="nm">{m.n}</td>
+                              <td class={`r amt ${(m.amt ?? 0) > 0 ? 'up' : (m.amt ?? 0) < 0 ? 'down' : 'dim'}`}>
+                                {m.amt == null ? '—' : (m.amt > 0 ? '+' : '') + m.amt.toFixed(2)}
+                              </td>
+                              <td class="r dim">{m.sc.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {bonds.length > 0 && (
+            <section class="ind">
+              <div class="ind__head">
+                <h2 class="bk__h">债券资金流 <span class="blk__date">{data.date}</span></h2>
+              </div>
+              <div class="bk__grid">
+                {bonds.map((bd: any) => (
+                  <details class="bk__card">
+                    <summary class="bk__sum">
+                      <div class="bk__name">
+                        {bd.name}
+                        <span class="bk__n">{bd.n} 只</span>
+                      </div>
+                      <div class={`bk__v ${bd.flow >= 0 ? 'up' : 'down'}`}>
+                        {n2(bd.flow)}
+                        <span class="bk__u">亿</span>
+                        {bd.scale > 0 && (
+                          <span class="bk__pct">
+                            {bd.flow >= 0 ? '+' : ''}
+                            {bd.strength.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <div class="bk__scale">
+                        规模 {bd.scale} 亿
+                        <span class="bk__more">点开看成分</span>
+                      </div>
+                    </summary>
+                    <div class="bk__tbwrap">
+                      <table class="bk__tb">
+                        <thead>
+                          <tr>
+                            <th>代码</th>
+                            <th>名称</th>
+                            <th class="r">净流入<span class="u">(亿元)</span></th>
+                            <th class="r">规模<span class="u">(亿元)</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(bd.members || []).map((m: any) => (
                             <tr>
                               <td class="code">{m.c}</td>
                               <td class="nm">{m.n}</td>
