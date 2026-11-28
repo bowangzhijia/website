@@ -137,6 +137,14 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                       <div class={`bk__v ${b.amt >= 0 ? 'up' : 'down'}`}>
                         {n2(b.amt)}
                         <span class="bk__u">亿</span>
+                        {/* 强度：净流入 / 规模。沪深300 盘子 5900 亿、中证1000 才 1000 亿，
+                            只看金额会误判成"大盘买得多"，摊到规模上才看得出谁更猛 */}
+                        {b.s > 0 && (
+                          <span class="bk__pct">
+                            {b.amt >= 0 ? '+' : ''}
+                            {((b.amt / b.s) * 100).toFixed(2)}%
+                          </span>
+                        )}
                       </div>
                       <div class="bk__scale">
                         篮子规模 {Math.round(b.s)} 亿
@@ -653,6 +661,15 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 8px;
+  }
+
+  /* 强度百分比：跟在大字金额后面，小一号，别抢主数字的注意力 */
+  .bk__pct {
+    margin-left: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
   }
 
   .bk__n {
