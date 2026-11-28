@@ -742,7 +742,7 @@ function computeIndustries(rows, excludeCodes) {
     });
   }
 
-  return out.sort((a, b) => Math.abs(b.flow) - Math.abs(a.flow));
+  return out.sort((a, b) => b.scale - a.scale);
 }
 
 /**
@@ -1088,7 +1088,7 @@ function writeLatest(date, { prev, rows }, dates) {
         };
       }),
       ...computeIndustries(rows),
-    ],
+    ].sort((a, b) => b.scale - a.scale),
     bonds: computeBonds(rows, loadIndustries().minScale || 10),
     anomalies: rows
       .filter((r) => Math.abs(r.deltaPct) >= 11 && inBasketCodes.has(r.code))
