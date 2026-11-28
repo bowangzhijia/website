@@ -308,6 +308,7 @@ const baskets: any[] = data?.baskets ?? [];
       let lastAxisMonth = '';
 
       if (!chart) chart = echarts.init(canvas, null, { renderer: 'canvas' });
+      (window as any).__fcChart = chart; // 调试用，方便在控制台手动触发事件
 
       /**
        * 把某一天的信息拼成一行 HTML。
@@ -366,23 +367,23 @@ const baskets: any[] = data?.baskets ?? [];
              * 手机竖屏上就是一截内容看不见。
              * max-width 兜住长文案，让它换行而不是横向撑出屏幕。
              */
-            confine: true,
+            confine: false,
+            /*
+             * 浮框贴着图表容器底部外侧显示，正落在图下方那条信息带的位置。
+             *
+             * 不设 appendToBody —— 那样坐标会变成文档坐标，还得手动补滚动量。
+             * 保持浮框挂在图表容器里，position 直接返回「容器底部再往下一点」，
+             * 容器没有 overflow:hidden，浮框可以正常溢出到外面。
+             * 索引仍然完全由 ECharts 算（和电脑版同一条路）。
+             */
+            position: (point: any, params: any, dom: any, rect: any, size: any) => {
+              if (window.innerWidth > 760) return [point[0] + 14, point[1] + 14];
+              return [8, size.viewSize[1] + 6];
+            },
             extraCssText:
               window.innerWidth > 760
                 ? 'max-width: 76vw; white-space: normal; line-height: 1.72; box-shadow: 0 6px 20px rgba(0,0,0,.14);'
-                : 'visibility: hidden; padding: 0; border: 0;',
-            /*
-             * 手机上固定贴在图表顶部居中。
-             * 默认跟着手指走，K 线密的时候框正好把手正在看的那段盖住；
-             * 固定到顶部后，价格主体大部分露出来。
-             */
-            position: (point: any, params: any, dom: any, rect: any, size: any) => {
-              // 桌面端跟着鼠标走，稍微偏移一点不挡光标
-              if (window.innerWidth > 760) return [point[0] + 14, point[1] + 14];
-              const vw = size.viewSize[0];
-              const cw = size.contentSize[0];
-              return [Math.max(6, (vw - cw) / 2), 6];
-            },
+                : 'padding: 8px 11px; border-radius: 10px; font-size: 11px; line-height: 1.6; white-space: nowrap; box-shadow: none; max-width: 92vw;',
             axisPointer: {
               // 手机上只要一条竖线，跟着点的地方走；桌面保留十字线
               type: window.innerWidth > 760 ? 'cross' : 'line',
@@ -393,34 +394,8 @@ const baskets: any[] = data?.baskets ?? [];
             backgroundColor: css('--surface', '#fff'),
             borderColor: line,
             textStyle: { color: text, fontSize: 12 },
-            formatter: (ps: any[]) => {
-              const i = ps[0]?.dataIndex ?? 0;
-              const b = bars[i];
-              if (!b) return '';
-              const f = b.flow;
-              let s = `<b>${b.label}</b>`;
-              if (b.o != null) {
-                const rising = b.c >= b.o;
-                s +=
-                  `<br/>开 ${b.o.toFixed(2)}　收 <b style="color:${rising ? up : down}">${b.c.toFixed(2)}</b>` +
-                  `<br/>高 ${b.h.toFixed(2)}　低 ${b.l.toFixed(2)}`;
-              }
-              if (i > flowEnd) {
-                s += `<br/><span style="opacity:.6">这天的份额还没公布，收盘后当晚更新</span>`;
-              } else if (b.label < bStart) {
-                s += `<br/><span style="opacity:.6">这个篮子的份额记录从 ${bStart} 起</span>`;
-              } else if (f === 0) {
-                s += '<br/><span style="opacity:.6">这天份额没有变动</span>';
-              } else {
-                s += `<br/>${label} <b style="color:${f >= 0 ? up : down}">${sig(f)} 亿</b>`;
-              }
-              const maLine = [30, 60, 250]
-                .filter((n) => maOn[n] && maData[n][i] != null)
-                .map((n) => `<span style="color:${maColor(n)}">MA${n} ${maData[n][i]}</span>`)
-                .join('　');
-              if (maLine) s += `<br/>${maLine}`;
-              return s;
-            },
+            // 内容统一由 infoHTML 生成：一行文案，桌面和手机看到的是同一套数据
+            formatter: (ps: any[]) => infoHTML(ps[0]?.dataIndex ?? 0),
           },
           /*
            * 用百分比而不是像素。
@@ -554,96 +529,15 @@ const baskets: any[] = data?.baskets ?? [];
       });
 
       /*
-       * 手机端的图外信息条。
-       * 浮层怎么摆都会压住 K 线，干脆拿到图表外面来显示——
-       * 点一下（或拖动十字线）就把当天数据写到下面这行，图本身始终完整可见。
+       * 图下方那条信息带只当「占位锚点」用：
+       * 手机上的 tooltip 会被定位到它的位置（见 option 里的 position），
+       * 所以平时保持一行提示，有交互时由浮框盖在上面显示读数。
        */
       const infoEl = root.querySelector('[data-info]') as HTMLElement | null;
-      if (infoEl) {
-        if (!infoEl.dataset.ready) {
-          infoEl.dataset.ready = '1';
-          infoEl.classList.add('fc__info--idle');
-          infoEl.textContent = '点一下图表，这里显示当天数据';
-        }
-
-        const showAt = (i: number) => {
-          if (i < 0 || i >= bars.length) return;
-          infoEl.classList.remove('fc__info--idle');
-          infoEl.innerHTML = infoHTML(i);
-        };
-
-        // 桌面：鼠标移动就更新（axisPointer 事件）
-        chart.off('updateAxisPointer');
-        chart.on('updateAxisPointer', (ev: any) => {
-          const ax = ev.axesInfo && ev.axesInfo[0];
-          if (!ax || ax.value == null) return;
-          showAt(labels.indexOf(String(ax.value)));
-        });
-
-        /*
-         * 手机：直接听画布上的触点，click 和 mousemove 都接。
-         *
-         * 只挂 click 的话，要等手指抬起才更新，手感很钝；
-         * 接上 mousemove（触摸拖动会被映射成它）之后，手指一按下去就跟着变，
-         * 和看盘软件的手感一致。
-         */
-        const zr = chart.getZr();
-        if (!infoEl.dataset.wired) {
-          infoEl.dataset.wired = '1';
-
-          const onPoint = (ev: any) => {
-            if (window.innerWidth > 760) return; // 桌面走鼠标悬浮
-
-            const x = ev.offsetX;
-            const y = ev.offsetY;
-
-            /*
-             * 自己算索引，不调 convertFromPixel。
-             *
-             * 这套图是「两个 grid + dataZoom + 多 series」，convertFromPixel 和
-             * findHover 在缩放状态下都会算偏（点 2026 年返回 1998 年）。
-             * 这里退回到最朴素的换算：
-             *   1. 取第一个 grid 的像素矩形
-             *   2. 算出点击位置在矩形里的横向占比
-             *   3. 用 dataZoom 的起止百分比换算成数据索引
-             * 不依赖任何 ECharts 内部状态，缩放后也准。
-             */
-            const model = chart.getModel();
-            const comp = model.getComponent('grid', 0);
-            const rect = comp?.coordinateSystem?.getRect?.();
-            if (!rect || !rect.width) return;
-
-            /*
-             * 不卡在绘图区边缘做 return。
-             * grid 右侧还有 12px 内边距，手指点在最后一根柱子上时容易落到留白里，
-             * 之前那样直接 return 会表现为「点最右边没反应」。
-             * 改成把横坐标夹回 0～1，点在边缘时自然吸附到最近的一根。
-             */
-            const ratio = Math.min(1, Math.max(0, (x - rect.x) / rect.width));
-            const total = labels.length;
-            const dz = chart.getOption().dataZoom?.[0] || { start: 0, end: 100 };
-            const s = Math.max(0, Math.min(100, Number(dz.start) || 0));
-            const e = Math.max(s, Math.min(100, Number(dz.end) ?? 100));
-            const from = Math.round((s / 100) * (total - 1));
-            const to = Math.round((e / 100) * (total - 1));
-
-            /*
-             * 注意 boundaryGap。
-             *
-             * 横轴是 category 且 boundaryGap: true，每根柱子占据宽度相等的一格、
-             * 住在格子正中，不是「点对点」落在刻度上。
-             * 所以要先算出可见范围内一共有几根，再按「第几格」取整——
-             * 直接按 (to-from) 线性插值会稳定偏半根，月K 上就表现为
-             * 点 10 月底却显示 10 月 16 号。
-             */
-            const n = to - from + 1;
-            const slot = Math.min(n - 1, Math.max(0, Math.floor(ratio * n)));
-            showAt(from + slot);
-          };
-
-          zr.on('click', onPoint);
-          zr.on('mousemove', onPoint);
-        }
+      if (infoEl && !infoEl.dataset.ready) {
+        infoEl.dataset.ready = '1';
+        infoEl.classList.add('fc__info--idle');
+        infoEl.textContent = '点一下图表，这里显示当天数据';
       }
 
       tabs.forEach((t, i) => t.setAttribute('aria-pressed', String(i === idxNo)));
