@@ -101,14 +101,6 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       <header class="sc__head">
         {!embedded && <a class="sc__back" href="/columns/etf-share/">← ETF份额</a>}
         {!embedded && <h1 class="sc__title">ETF 份额看板</h1>}
-        <p class="sc__lead">
-          {
-            data
-              ? `更新至 ${dateLabel} 收盘，对比上一交易日（${data.prevDate}）。份额是真金白银的申购赎回，规模涨可能只是净值涨。`
-              : '数据正在准备，稍后就有'
-          }
-        </p>
-        <p class="sc__meta">每个交易日 20:30 前后更新；当晚交易所尚未披露的，次日上午 9 点后补上</p>
       </header>
 
       {data && <RunStatus date={data.date} total={data.total} partial={data.partial} />}
@@ -154,11 +146,8 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
             <section class="bk">
               <div class="bk__head">
                 <h2 class="bk__h">指数篮子 <span class="blk__date">{data.date}</span></h2>
-                <p class="bk__sub">
-                  一个指数挂十几只 ETF，是同一份敞口。汇金买哪只都一样，加总才看得出进了多少钱。
-                  点开任意一个能看成分明细；最后一个「创新药」是主题篮子，港股占六成。
-                </p>
               </div>
+
               <div class="bk__grid">
                 {baskets.map((b: any) => (
                   <details class="bk__card">
@@ -208,10 +197,6 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                   </details>
                 ))}
               </div>
-              <p class="bk__foot">
-                篮子合计 <strong class={basketAmount >= 0 ? 'up' : 'down'}>{n2(basketAmount)} 亿</strong>
-                ，其余 {rows.length - baskets.reduce((s: number, b: any) => s + (b.n || 0), 0)} 行变动来自行业主题、跨境、债券和商品。
-              </p>
             </section>
           )}
 
@@ -234,20 +219,21 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
                       <th>名称</th>
                       <th class="r">净流入(亿元)</th>
                       <th class="r">规模(亿元)</th>
+                      <th>判定</th>
                     </tr>
                   </thead>
                   <tbody>
                     {anomalies.map((a: any) => (
                       <tr>
                         <td class="code">{a.c}</td>
-                        <td class="nm">
-                          {a.n}
-                          {a.sp ? <span class="an__badge is-split">疑似折算</span> : null}
-                        </td>
+                        <td class="nm">{a.n}</td>
                         <td class={`r amt ${a.amt == null ? 'dim' : a.amt > 0 ? 'up' : a.amt < 0 ? 'down' : 'dim'}`}>
                           {a.amt == null ? '—' : (a.amt > 0 ? '+' : '') + a.amt}
                         </td>
                         <td class="r dim">{a.sc}</td>
+                        <td class="an__tag">
+                          {a.sp ? <span class="an__badge is-split">疑似折算</span> : <span class="an__badge">正常申赎</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -255,14 +241,6 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
               </div>
             </details>
           )}
-
-          <p class="scope">
-            全市场 <strong>{rows.length}</strong> 只 ETF，当日有 <strong>{changedCount}</strong> 只出现份额变动。
-            榜单只收录其中规模 ≥ {MIN_SCALE} 亿的（<strong>{pool.length}</strong> 只，{poolChanged} 只有变动）。
-            门槛每天按最新规模重算，涨过线自动纳入、缩下去自动剔除，不用维护名单。
-            份额是交易所收盘后披露的统计口径，不是盘中实时行情。
-            想看某只具体的，往下拉搜索框，那里是全量。
-          </p>
 
           {/* 搜索是全量 987 行，静态渲染太重，交给 JS 过滤 */}
           <div class="sr">
@@ -307,7 +285,7 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {upRedeem.length > 0 && (
             <section class="blk">
               <h2 class="blk__h">涨了，份额却在减 <span class="blk__date">{data.date}</span></h2>
-              <p class="blk__tip">价格涨、份额降，有资金借着上涨离场。只列 5 亿元以上的。</p>
+
               <ShareTable rows={upRedeem} hasPrice={hasPrice} />
             </section>
           )}
@@ -315,15 +293,10 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
           {downBuy.length > 0 && (
             <section class="blk">
               <h2 class="blk__h">跌了，份额反而增 <span class="blk__date">{data.date}</span></h2>
-              <p class="blk__tip">价格跌、份额涨，是逆势抄底的动作。只列 5 亿元以上的。</p>
+
               <ShareTable rows={downBuy} hasPrice={hasPrice} showStreak />
             </section>
           )}
-
-          <p class="foot">
-            数据来自上交所 / 深交所官方披露，金额按当日收盘价折算，是估算值。
-            新上市 ETF 首日无份额，已跳过；份额拆分或大额申购会在文章里单独说明。
-          </p>
         </>
       )}
     </div>
@@ -876,7 +849,26 @@ const n2 = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
       font-size: 10.5px;
     }
 
-    .an__tb th:nth-child(1), .an__tb td:nth-child(1),
+    .an__tb th:nth-child(1), .an__tb td:nth-child(1) {
+      width: 18%;
+    }
+
+    .an__tb th:nth-child(2), .an__tb td:nth-child(2) {
+      width: 26%;
+    }
+
+    .an__tb th:nth-child(3), .an__tb td:nth-child(3) {
+      width: 22%;
+    }
+
+    .an__tb th:nth-child(4), .an__tb td:nth-child(4) {
+      width: 16%;
+    }
+
+    .an__tb th:nth-child(5), .an__tb td:nth-child(5) {
+      width: 18%;
+    }
+
     .sr__table th:nth-child(1), .sr__table td:nth-child(1) {
       width: 19%;
     }
